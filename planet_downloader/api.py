@@ -39,9 +39,9 @@ class DownloadExpired(PlanetError):
 def safe_message(value, secret=''):
     value = str(value)
     if secret:
-        value = value.replace(secret, '[omesso]')
-    value = re.sub(r'\bBearer\s+[^\s\"\'<>]+', 'Bearer [omesso]', value, flags=re.IGNORECASE)
-    value = re.sub(r'https?://[^\s\"\'<>]+', '[URL omesso]', value)
+        value = value.replace(secret, '[redacted]')
+    value = re.sub(r'\bBearer\s+[^\s\"\'<>]+', 'Bearer [redacted]', value, flags=re.IGNORECASE)
+    value = re.sub(r'https?://[^\s\"\'<>]+', '[URL redacted]', value)
     return value[:800]
 
 
@@ -62,7 +62,7 @@ def validate_url(url, api=False):
         if not valid:
             raise ValueError
     except ValueError:
-        raise PlanetError('URL del servizio non valido o non consentito.') from None
+        raise PlanetError('Invalid or disallowed service URL.') from None
     return url
 
 
@@ -114,14 +114,14 @@ class PlanetClient:
         """
         if request_auth is not None:
             if api_key is not None:
-                raise PlanetError('Specificare la chiave API oppure l’autenticatore Planet, non entrambi.')
+                raise PlanetError('Provide an API key or a Planet authenticator, not both.')
             if not isinstance(request_auth, requests.auth.AuthBase):
-                raise PlanetError('Autenticatore Planet non valido: serve un requests.auth.AuthBase.')
+                raise PlanetError('Invalid Planet authenticator: requests.auth.AuthBase is required.')
             self._key = ''
             self._api_auth = request_auth
         else:
             if not isinstance(api_key, str) or not api_key.strip():
-                raise PlanetError('Inserire la chiave API Planet o autenticarsi con Planet.')
+                raise PlanetError('Enter a Planet API key or authenticate with Planet.')
             self._key = api_key.strip()
             self._api_auth = (self._key, '')
         self.emit = emit
@@ -144,7 +144,7 @@ class PlanetClient:
 
     def check_cancel(self):
         if self.cancel.is_set():
-            raise InterruptedError('Operazione locale sospesa; gli ordini Planet già inviati continuano.')
+            raise InterruptedError('Local operation paused; submitted Planet orders continue.')
 
     def wait(self, seconds):
         if self.cancel.wait(seconds):
@@ -161,15 +161,15 @@ class PlanetClient:
                     **_transport_options(url))
             except requests.RequestException:
                 if create:
-                    raise AmbiguousSubmission('Invio ordine senza risposta certa. Verifica di riconciliazione necessaria.') from None
+                    raise AmbiguousSubmission('Order submission outcome is uncertain. Reconciliation is required.') from None
                 if attempt + 1 == attempts:
-                    raise PlanetError('Connessione Planet interrotta o scaduta. Riprovare più tardi.') from None
+                    raise PlanetError('Planet connection interrupted or timed out. Try again later.') from None
                 self.wait(min(30, 2 ** attempt))
                 continue
             status = response.status_code
             if create and (status >= 500 or status == 408):
                 response.close()
-                raise AmbiguousSubmission('Planet non ha confermato la creazione dell’ordine; esito incerto.', status)
+                raise AmbiguousSubmission('Planet did not confirm order creation; the outcome is uncertain.', status)
             if status in (429, 500, 502, 503, 504) and attempt + 1 < attempts:
                 delay = response.headers.get('Retry-After', '')
                 try:
@@ -177,7 +177,7 @@ class PlanetClient:
                 except ValueError:
                     delay = min(30, 2 ** attempt)
                 response.close()
-                self.emit(f'Planet temporaneamente occupato (HTTP {status}); nuovo tentativo.')
+                self.emit(f'Planet is temporarily busy (HTTP {status}); retrying.')
                 self.wait(delay)
                 continue
             if not 200 <= status < 300:
@@ -186,14 +186,14 @@ class PlanetClient:
                 # Keep OAuth HTTP errors to status text rather than echoing a body.
                 detail = safe_message(response.text, self._key) if self._key else ''
                 response.close()
-                prefix = {401: 'Credenziali Planet non valide o scadute', 403: 'Accesso o quota non sufficienti',
-                          429: 'Limite di richieste raggiunto'}.get(status, 'Richiesta Planet rifiutata')
+                prefix = {401: 'Invalid or expired Planet credentials', 403: 'Insufficient access or quota',
+                          429: 'Request rate limit reached'}.get(status, 'Planet request rejected')
                 raise PlanetError(f'{prefix} (HTTP {status}). {detail}', status)
             try:
                 data = response.json()
             except ValueError:
                 cls = AmbiguousSubmission if create else PlanetError
-                raise cls('Risposta Planet non interpretabile; nessun nuovo invio automatico.') from None
+                raise cls('Invalid Planet response; no automatic resubmission.') from None
             finally:
                 response.close()
             return data
@@ -211,7 +211,7 @@ class PlanetClient:
                 break
             link = urljoin(API, link)
             if link in visited:
-                raise PlanetError('Paginazione Planet ripetuta; ricerca fermata per evitare risultati incompleti.')
+                raise PlanetError('Repeated Planet pagination link; search stopped to avoid incomplete results.')
             visited.add(link)
             result = self._request('GET', link)
 
@@ -226,15 +226,15 @@ class PlanetClient:
         try:
             value = float(value)
         except (TypeError, ValueError):
-            raise PlanetError('Planet non ha restituito una percentuale UDM2 valida.') from None
+            raise PlanetError('Planet did not return a valid UDM2 percentage.') from None
         if not math.isfinite(value) or not 0 <= value <= 100:
-            raise PlanetError('Percentuale UDM2 fuori intervallo.')
+            raise PlanetError('UDM2 percentage out of range.')
         return value
 
     @staticmethod
     def _coverage_request_info(item_type, item_id, geometry, band):
         if band not in {'clear', 'cloud', 'snow_ice', 'cloud_shadow', 'light_haze', 'heavy_haze'}:
-            raise ValueError('Banda UDM2 non supportata.')
+            raise ValueError('Unsupported UDM2 band.')
         url = API + '/data/v1/item-types/' + quote(item_type, safe='') + '/items/' + quote(item_id, safe='') + '/coverage'
         geometry_hash = hashlib.sha256(json.dumps(geometry, sort_keys=True, separators=(',', ':'),
                                                   allow_nan=False).encode()).hexdigest()
@@ -249,7 +249,7 @@ class PlanetClient:
         """
         self.check_cancel()
         if cancel is not None and cancel.is_set():
-            raise InterruptedError('Ricerca sospesa.')
+            raise InterruptedError('Search paused.')
         url, key = self._coverage_request_info(item_type, item_id, geometry, band)
         data = self._request('POST', url, params={'mode': 'UDM2', 'band': band}, json={'geometry': geometry})
         status = data.get('status')
@@ -259,12 +259,12 @@ class PlanetClient:
             return value
         if status == 'activating':
             return None
-        raise PlanetError(f'Calcolo UDM2 non completato: {safe_message(status)}.')
+        raise PlanetError(f'UDM2 calculation incomplete: {safe_message(status)}.')
 
     def coverage(self, item_type, item_id, geometry, band='clear', cancel=None):
         self.check_cancel()
         if cancel is not None and cancel.is_set():
-            raise InterruptedError('Ricerca sospesa.')
+            raise InterruptedError('Search paused.')
         url, key = self._coverage_request_info(item_type, item_id, geometry, band)
         if key in self._coverage_cache:
             return self._coverage_cache.pop(key)
@@ -272,27 +272,27 @@ class PlanetClient:
         last_progress = None
         while True:
             if cancel is not None and cancel.is_set():
-                raise InterruptedError('Ricerca sospesa.')
+                raise InterruptedError('Search paused.')
             data = self._request('POST', url, params={'mode': 'UDM2', 'band': band}, json={'geometry': geometry})
             status = data.get('status')
             if status == 'complete':
                 return self._coverage_value(data, band)
             if status != 'activating':
-                raise PlanetError(f'Calcolo UDM2 non completato: {safe_message(status)}.')
+                raise PlanetError(f'UDM2 calculation incomplete: {safe_message(status)}.')
             now = time.monotonic()
             elapsed = now - started
             if last_progress is None or now - last_progress >= 60:
-                self.emit(f'Scena {item_id}: attivazione UDM2 per {band} in corso '
-                          f'({int(elapsed)} s trascorsi); attendo Planet.')
+                self.emit(f'Scene {item_id}: UDM2 activation for {band} in progress '
+                          f'({int(elapsed)} s elapsed); waiting for Planet.')
                 last_progress = now
             if elapsed > 3600:
-                raise PlanetError('Attivazione UDM2 oltre un’ora. Ripetere la ricerca più tardi.')
+                raise PlanetError('UDM2 activation exceeded one hour. Repeat the search later.')
             self.wait(self.poll_interval)
 
     def create_order(self, payload):
         data = self._request('POST', ORDERS, json=payload, retry=False, create=True)
         if not isinstance(data, dict) or not data.get('id'):
-            raise AmbiguousSubmission('Ordine inviato ma identificativo non ricevuto.')
+            raise AmbiguousSubmission('Order submitted but no identifier received.')
         return data
 
     def get_order(self, order_id):
@@ -302,7 +302,7 @@ class PlanetClient:
         link, visited = ORDERS, set()
         while link:
             if link in visited:
-                raise PlanetError('Paginazione ordini ripetuta.')
+                raise PlanetError('Repeated order pagination link.')
             visited.add(link)
             data = self._request('GET', link)
             yield from data.get('orders', [])
@@ -332,15 +332,15 @@ class PlanetClient:
                         continue
                     break
                 else:
-                    raise PlanetError('Troppi reindirizzamenti nel download.')
+                    raise PlanetError('Too many download redirects.')
                 if response.status_code in (401, 403):
-                    raise DownloadExpired('Link di download scaduto: aggiornamento necessario.', response.status_code)
+                    raise DownloadExpired('Download link expired: refresh required.', response.status_code)
                 if response.status_code != 200:
                     if response.status_code in (429, 500, 502, 503, 504) and attempt + 1 < self.retry_count:
                         response.close()
                         self.wait(min(30, 2 ** attempt))
                         continue
-                    raise PlanetError(f'Download rifiutato (HTTP {response.status_code}).', response.status_code)
+                    raise PlanetError(f'Download rejected (HTTP {response.status_code}).', response.status_code)
                 sha256, md5, size = hashlib.sha256(), hashlib.md5(), 0
                 with part.open('wb') as stream:
                     for chunk in response.iter_content(chunk_size=1024 * 1024):
@@ -353,21 +353,21 @@ class PlanetClient:
                     stream.flush()
                     os.fsync(stream.fileno())
                 if expected.get('size') is not None and size != int(expected['size']):
-                    raise PlanetError('Dimensione file diversa dal manifesto Planet; file non accettato.')
+                    raise PlanetError('File size differs from the Planet manifest; file rejected.')
                 content_length = response.headers.get('Content-Length')
                 if content_length and not response.headers.get('Content-Encoding') and size != int(content_length):
-                    raise PlanetError('Download incompleto; file non accettato.')
+                    raise PlanetError('Incomplete download; file rejected.')
                 digests = expected.get('digests') or {}
                 for algo, actual in [('sha256', sha256.hexdigest()), ('md5', md5.hexdigest())]:
                     if digests.get(algo) and str(digests[algo]).lower() != actual:
-                        raise PlanetError('Checksum diverso dal manifesto Planet; file non accettato.')
+                        raise PlanetError('Checksum differs from the Planet manifest; file rejected.')
                 os.replace(part, destination)
                 return {'size': size, 'sha256': sha256.hexdigest()}
             except requests.RequestException:
                 if attempt + 1 == self.retry_count:
-                    raise PlanetError('Connessione interrotta durante il download. Riprendere il lavoro.') from None
+                    raise PlanetError('Connection interrupted during download. Resume the job.') from None
                 self.wait(min(30, 2 ** attempt))
             finally:
                 if response is not None:
                     response.close()
-        raise PlanetError('Download non completato.')
+        raise PlanetError('Download incomplete.')

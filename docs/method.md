@@ -1,6 +1,6 @@
 # Method and limitations
 
-PlanetDownloader searches PlanetScope imagery for vector-defined areas, prepares an order plan for confirmation, and produces local daily mosaics. The GUI is in Italian and accepts a Planet API key. The Python client also accepts a `requests.auth.AuthBase` authenticator as an alternative; OAuth is not exposed in the GUI.
+PlanetDownloader searches PlanetScope imagery for vector-defined areas, prepares an order plan for confirmation, and produces local daily mosaics. The GUI is in English and accepts a Planet API key. The Python client also accepts a `requests.auth.AuthBase` authenticator as an alternative; OAuth is not exposed in the GUI.
 
 ## Search and geometric coverage
 

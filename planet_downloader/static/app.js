@@ -16,7 +16,7 @@
   const numericKeys = new Set(["cloud_scene_max", "aoi_cloud_max", "aoi_clear_min", "coverage_min", "sun_elevation_min", "view_angle_max", "resolution", "confidence_min", "batch_size"]);
   const booleanKeys = new Set(["quality_standard", "ground_control", "clear_only"]);
   const activeStatuses = new Set(["searching", "running"]);
-  const fmt = (value, decimals = 0) => Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value).toLocaleString("it-IT", { maximumFractionDigits: decimals }) : "—";
+  const fmt = (value, decimals = 0) => Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value).toLocaleString("en-GB", { maximumFractionDigits: decimals }) : "—";
   const percent = (value) => value === null || value === undefined || value === "" ? "—" : `${fmt(value, 1)}%`;
   const node = (tag, text, className) => { const el = document.createElement(tag); if (text !== undefined) el.textContent = String(text); if (className) el.className = className; return el; };
   const isActive = () => state.job && activeStatuses.has(state.job.status);
@@ -30,9 +30,9 @@
     }
     let response;
     try { response = await fetch(path, { ...options, headers, credentials: "same-origin", cache: "no-store" }); }
-    catch (_) { throw new Error("Non riesco a contattare il programma locale. Verifica che la finestra di avvio sia ancora aperta."); }
+    catch (_) { throw new Error("Cannot connect to the local application. Check that the launcher window is still open."); }
     if (!response.ok) {
-      let message = `Richiesta non riuscita (HTTP ${response.status}).`;
+      let message = `Request failed (HTTP ${response.status}).`;
       try { const payload = await response.json(); message = payload.error || payload.message || message; } catch (_) { /* Keep a generic message; never expose a raw server page. */ }
       throw new Error(typeof message === "string" ? message : JSON.stringify(message));
     }
@@ -57,7 +57,7 @@
     const locked = state.pending || !!isActive();
     document.querySelectorAll("#config-form input, #config-form select, #config-form button").forEach((el) => { el.disabled = locked; });
     $("search-button").disabled = !state.ready || locked;
-    $("search-button").textContent = state.job?.status === "searching" ? "Ricerca in corso…" : "Cerca immagini →";
+    $("search-button").textContent = state.job?.status === "searching" ? "Searching…" : "Search images →";
     $("resume-button").disabled = !state.ready || locked;
     $("resume-dir").disabled = locked;
     $("confirm-button").disabled = locked || state.stale || !state.plan || state.job?.status !== "ready" || !(Number(state.plan.totals?.scene_count) > 0);
@@ -87,7 +87,7 @@
   }
 
   function applyConfig(config) {
-    if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Il file non contiene un oggetto di impostazioni valido.");
+    if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("The file does not contain valid settings.");
     for (const [key, id] of Object.entries(configInputs)) {
       if (!Object.prototype.hasOwnProperty.call(config, key)) continue;
       const value = config[key];
@@ -104,7 +104,7 @@
 
   function productInfo() {
     const product = state.products[$("product").value];
-    $("product-description").textContent = product ? `${product.item_type} · ${product.bands} bande · pixel nativo indicativo ${fmt(product.resolution, 1)} m. Disponibilità e permessi dipendono dall’account.` : "";
+    $("product-description").textContent = product ? `${product.item_type} · ${product.bands} bands · nominal product pixel size ${fmt(product.resolution, 1)} m. Availability and permissions depend on your account.` : "";
   }
 
   function vectorSignature() {
@@ -113,19 +113,19 @@
 
   async function loadVector() {
     const files = [...$("vector-files").files];
-    if (!files.length) throw new Error("Seleziona il file vettoriale. Per uno Shapefile seleziona insieme almeno .shp, .shx, .dbf e .prj oppure carica uno ZIP.");
+    if (!files.length) throw new Error("Select a vector dataset. For a Shapefile, select at least .shp, .shx, .dbf, and .prj together, or upload a ZIP.");
     const form = new FormData();
     files.forEach((file) => form.append("files", file));
     form.append("layer", $("layer").value.trim());
     form.append("name_field", $("name-field").value.trim());
     $("vector-status").classList.remove("is-error");
-    $("vector-status").textContent = "Lettura del file e controllo delle geometrie…";
+    $("vector-status").textContent = "Reading the dataset and checking geometries…";
     const data = await api("/api/vector", { method: "POST", body: form });
     state.vectorId = data.vector_id;
     state.vectorSignature = vectorSignature();
     const areas = data.areas || [];
     const km2 = areas.reduce((sum, area) => sum + Number(area.area_km2 || 0), 0);
-    $("vector-status").textContent = `${fmt(areas.length)} ${areas.length === 1 ? "area caricata" : "aree caricate"} · ${fmt(km2, 3)} km² complessivi`;
+    $("vector-status").textContent = `${fmt(areas.length)} ${areas.length === 1 ? "area loaded" : "areas loaded"} · ${fmt(km2, 3)} km² in total`;
     $("area-list").replaceChildren();
     areas.forEach((area) => { const row = node("div", undefined, "area-item"); row.append(node("span", area.name || area.id), node("span", `${fmt(area.area_km2, 3)} km²`)); $("area-list").append(row); });
     $("area-list").hidden = !areas.length;
@@ -138,13 +138,13 @@
     if (state.pending) return;
     error(""); state.pending = true; controls();
     try { await fn(); }
-    catch (err) { error(err.message || "Operazione non riuscita."); }
+    catch (err) { error(err.message || "Operation failed."); }
     finally { state.pending = false; controls(); }
   }
 
   function requireKey() {
     const key = $("api-key").value.trim();
-    if (!key) throw new Error("Inserisci la chiave API Planet prima di continuare.");
+    if (!key) throw new Error("Enter your Planet API key before continuing.");
     return key;
   }
 
@@ -163,7 +163,7 @@
     } catch (err) {
       state.connectionErrors += 1;
       $("job-error").hidden = false;
-      $("job-error").textContent = `${err.message} Riprovo automaticamente.`;
+      $("job-error").textContent = `${err.message} Retrying automatically.`;
     } finally {
       state.polling = false;
       if (isActive() || state.pending || state.connectionErrors > 0) state.poll = setTimeout(pollJob, state.connectionErrors ? 5000 : 2000);
@@ -174,21 +174,21 @@
     const oldStatus = state.job?.status;
     state.job = job;
     $("job-panel").hidden = false;
-    const statuses = { searching: "Ricerca", ready: "Da confermare", running: "In corso", done: "Terminato", error: "Errore", paused: "Interrotto" };
+    const statuses = { searching: "Searching", ready: "Awaiting confirmation", running: "Running", done: "Finished", error: "Error", paused: "Stopped" };
     const descriptions = {
-      searching: "Ricerca delle scene, controlli UDM2 e preparazione degli ordini. Nessun ordine viene inviato in questa fase.",
-      ready: "Il piano è disponibile. Controlla immagini e stima prima di confermare.",
-      running: "Ordini, download e mosaici in elaborazione. Mantieni aperto il programma locale.",
-      done: "L’elaborazione è terminata. Consulta l’esito per verificare immagini escluse o eventuali problemi.",
-      error: "Il lavoro non è stato completato. Consulta il messaggio e il registro; se una cartella di lavoro è già stata creata puoi riprenderla.",
-      paused: "Il lavoro locale è stato interrotto. Gli ordini già inviati a Planet possono essere ancora in esecuzione."
+      searching: "Searching scenes, checking UDM2 quality, and preparing the plan. No orders are submitted at this stage.",
+      ready: "The plan is ready. Review the images and estimate before confirming.",
+      running: "Orders, downloads, and mosaics are being processed. Keep the local application open.",
+      done: "Processing has finished. Review the results for excluded images or other issues.",
+      error: "The job did not finish. Review the error and activity log. If a job folder was created, you can resume from it.",
+      paused: "Local processing was stopped. Orders already submitted to Planet may still be running."
     };
     const partial = isPartial(job.summary);
-    $("job-status").textContent = partial && job.status === "done" ? "Parziale" : statuses[job.status] || job.status;
+    $("job-status").textContent = partial && job.status === "done" ? "Partial" : statuses[job.status] || job.status;
     $("job-status").className = `status-chip ${job.status === "error" ? "error" : job.status === "paused" || partial ? "paused" : ""}`;
-    $("job-id").textContent = job.id ? `Lavoro ${job.id}` : "";
+    $("job-id").textContent = job.id ? `Job ${job.id}` : "";
     $("job-description").textContent = descriptions[job.status] || "";
-    $("job-location").textContent = job.job_dir ? `Cartella del lavoro:\n${job.job_dir}` : "";
+    $("job-location").textContent = job.job_dir ? `Job folder:\n${job.job_dir}` : "";
     $("job-location").hidden = !job.job_dir;
     if (job.job_dir) $("resume-dir").value = job.job_dir;
     $("job-spinner").hidden = !activeStatuses.has(job.status);
@@ -199,7 +199,7 @@
     const logBox = $("job-logs");
     if (logBox.textContent !== logText) {
       const atBottom = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 45;
-      logBox.textContent = logText || "In attesa delle attività…";
+      logBox.textContent = logText || "Waiting for activity…";
       if (atBottom) logBox.scrollTop = logBox.scrollHeight;
     }
     [1, 2, 3].forEach((step) => $("step-" + step).classList.toggle("current", step === (job.status === "ready" ? 2 : ["running", "done", "paused"].includes(job.status) ? 3 : 1)));
@@ -213,8 +213,8 @@
       }
     }
     const downloadStarted = ["running", "done", "paused", "error"].includes(job.status);
-    $("confirm-title").textContent = downloadStarted ? "Piano del lavoro" : "Pronto per il download?";
-    $("confirm-description").textContent = downloadStarted ? "Gli ordini e le elaborazioni seguono questo piano. Verifica lo stato del lavoro e il riepilogo dell’esito." : "Saranno scaricate tutte le immagini del piano. I file finali sono organizzati per area e data.";
+    $("confirm-title").textContent = downloadStarted ? "Job plan" : "Ready to download?";
+    $("confirm-description").textContent = downloadStarted ? "Orders and processing follow this plan. Check the job status and result summary." : "All images in the plan will be downloaded. Output files are organised by area and date.";
     if (job.summary) renderCompletion(job.summary, job.status);
     else if (oldStatus !== job.status && activeStatuses.has(job.status)) $("completion").hidden = true;
     controls();
@@ -232,14 +232,14 @@
     const config = plan.config || {};
     $("results").hidden = false;
     const product = state.products[config.product]?.label || config.product || "";
-    $("plan-context").textContent = `${product} · ${config.start_date || ""} → ${config.end_date || ""} · Date UTC incluse`;
+    $("plan-context").textContent = `${product} · ${config.start_date || ""} → ${config.end_date || ""} · Inclusive UTC dates`;
     $("metric-scenes").textContent = fmt(totals.scene_count);
     $("metric-areas").textContent = fmt(totals.area_count);
     $("metric-km2").textContent = fmt(totals.estimated_km2, 3);
     $("metric-orders").textContent = fmt(totals.order_count);
-    $("unique-scenes").textContent = `${fmt(totals.unique_scene_count)} scene uniche`;
-    $("day-count").textContent = `${fmt(totals.day_count)} combinazioni area / giorno`;
-    $("estimate-details").textContent = `Area ritagliata senza ripetizioni degli ordini: ${fmt(totals.unique_clipped_km2, 3)} km². Confronto con le scene intere: ${fmt(totals.full_scene_km2, 3)} km².`;
+    $("unique-scenes").textContent = `${fmt(totals.unique_scene_count)} unique scenes`;
+    $("day-count").textContent = `${fmt(totals.day_count)} area–day pairs`;
+    $("estimate-details").textContent = `Unique clipped area, excluding repeated coverage: ${fmt(totals.unique_clipped_km2, 3)} km². Full-scene area for comparison: ${fmt(totals.full_scene_km2, 3)} km².`;
     const warnings = [...(Array.isArray(plan.warnings) ? plan.warnings : [])];
     $("areas-summary").replaceChildren();
     state.rows = []; state.shown = 0;
@@ -247,14 +247,14 @@
       const scenes = area.scenes || [];
       const dates = new Set(scenes.map((scene) => scene.date || (scene.acquired || "").slice(0, 10)));
       const areaCard = node("div", undefined, "area-summary-item");
-      areaCard.append(node("h3", area.name || area.id), node("p", `${fmt(area.area_km2, 3)} km² · ${fmt(scenes.length)} scene · ${fmt(dates.size)} giorni · ${fmt((area.zones || []).length)} zone di coregistrazione`));
+      areaCard.append(node("h3", area.name || area.id), node("p", `${fmt(area.area_km2, 3)} km² · ${fmt(scenes.length)} scenes · ${fmt(dates.size)} days · ${fmt((area.zones || []).length)} coregistration zones`));
       $("areas-summary").append(areaCard);
       (area.warnings || []).forEach((warning) => warnings.push(`${area.name || area.id}: ${typeof warning === "string" ? warning : JSON.stringify(warning)}`));
       scenes.forEach((scene) => state.rows.push({ area: area.name || area.id, ...scene }));
     });
-    if (!Number(totals.scene_count)) warnings.unshift("Nessuna immagine rispetta i filtri. Amplia il periodo o modifica le soglie, poi ripeti la ricerca.");
+    if (!Number(totals.scene_count)) warnings.unshift("No images match the filters. Extend the date range or adjust the thresholds, then search again.");
     renderWarnings($("plan-warnings"), [...new Set(warnings)]);
-    $("scene-table-label").textContent = `Elenco delle immagini · ${fmt(state.rows.length)} scene × aree`;
+    $("scene-table-label").textContent = `Image list · ${fmt(state.rows.length)} scene–area pairs`;
     $("scenes-table").replaceChildren();
     appendRows();
   }
@@ -269,15 +269,15 @@
     }
     $("scenes-table").append(fragment); state.shown = end;
     $("more-scenes").hidden = end >= state.rows.length;
-    $("more-scenes").textContent = `Mostra altre ${Math.min(200, state.rows.length - end)} righe (${fmt(end)} di ${fmt(state.rows.length)})`;
+    $("more-scenes").textContent = `Show ${Math.min(200, state.rows.length - end)} more rows (${fmt(end)} of ${fmt(state.rows.length)})`;
   }
 
   function renderCompletion(summary, status) {
     $("completion").hidden = false;
     const warnings = [...(Array.isArray(summary.warnings) ? summary.warnings : [])];
     const incomplete = status !== "done" || isPartial(summary);
-    $("completion-title").textContent = incomplete ? "Lavoro terminato con elementi da verificare" : "Elaborazione terminata";
-    $("completion-description").textContent = incomplete ? "Alcune immagini o elaborazioni non sono state completate. Controlla i dettagli prima di utilizzare i mosaici." : "Controlla il riepilogo dei file prodotti e delle eventuali esclusioni prima di utilizzare i dati.";
+    $("completion-title").textContent = incomplete ? "Job finished with issues to review" : "Processing finished";
+    $("completion-description").textContent = incomplete ? "Some images or processing steps were not completed. Review the details before using the mosaics." : "Review the output summary and any excluded images before using the data.";
     const directory = summary.job_dir || summary.output_dir || "";
     $("completion-location").textContent = directory;
     $("completion-location").hidden = !directory;
@@ -297,7 +297,7 @@
     if (!$("config-form").reportValidity()) return;
     action(async () => {
       const apiKey = requireKey(); const config = readConfig();
-      if (config.start_date > config.end_date) throw new Error("La data iniziale deve precedere o coincidere con la data finale.");
+      if (config.start_date > config.end_date) throw new Error("The start date must be on or before the end date.");
       if (!state.vectorId || state.vectorSignature !== vectorSignature()) await loadVector();
       const data = await api("/api/search", { method: "POST", body: { api_key: apiKey, vector_id: state.vectorId, config } });
       state.plan = null; state.planKey = ""; state.stale = false;
@@ -307,55 +307,55 @@
   });
 
   $("load-vector").addEventListener("click", () => action(async () => { markDirty(); await loadVector(); }));
-  $("vector-files").addEventListener("change", () => { state.vectorId = null; $("area-list").hidden = true; $("vector-status").textContent = "Premi “Leggi le aree” per controllare il file."; markDirty(); });
+  $("vector-files").addEventListener("change", () => { state.vectorId = null; $("area-list").hidden = true; $("vector-status").textContent = "Click “Load areas” to check the dataset."; markDirty(); });
   $("config-form").addEventListener("input", (event) => { if (!["api-key", "settings-file"].includes(event.target.id)) markDirty(); });
   $("config-form").addEventListener("change", (event) => { if (!["api-key", "settings-file"].includes(event.target.id)) markDirty(); });
   $("product").addEventListener("change", productInfo);
-  $("toggle-key").addEventListener("click", () => { const shown = $("api-key").type === "password"; $("api-key").type = shown ? "text" : "password"; $("toggle-key").textContent = shown ? "Nascondi" : "Mostra"; $("toggle-key").setAttribute("aria-pressed", String(shown)); $("toggle-key").setAttribute("aria-label", shown ? "Nascondi chiave API" : "Mostra chiave API"); });
+  $("toggle-key").addEventListener("click", () => { const shown = $("api-key").type === "password"; $("api-key").type = shown ? "text" : "password"; $("toggle-key").textContent = shown ? "Hide" : "Show"; $("toggle-key").setAttribute("aria-pressed", String(shown)); $("toggle-key").setAttribute("aria-label", shown ? "Hide API key" : "Show API key"); });
 
   $("browse-output").addEventListener("click", () => action(async () => {
     try { const data = await api("/api/browse", { method: "POST", body: { kind: "output" } }); if (data.path) { $("output-dir").value = data.path; markDirty(); } }
-    catch (_) { throw new Error("La finestra di scelta cartella non è disponibile. Copia e incolla il percorso completo in “Cartella dei download”."); }
+    catch (_) { throw new Error("The folder picker is unavailable. Copy and paste the full path into “Download folder”."); }
   }));
 
   $("confirm-button").addEventListener("click", () => {
     if (!state.plan || state.stale || state.job?.status !== "ready") return;
     const totals = state.plan.totals;
-    const message = `Confermi l’invio degli ordini Planet e il download?\n\n${fmt(totals.scene_count)} scene × aree (${fmt(totals.unique_scene_count)} scene uniche).\nStima geometrica: ${fmt(totals.estimated_km2, 3)} km², inclusi i riferimenti ripetuti.\n\nIl consumo effettivo dipende dal tuo contratto Planet. Gli ordini già inviati possono proseguire anche se interrompi il lavoro locale.`;
+    const message = `Submit the Planet orders and start downloading?\n\n${fmt(totals.scene_count)} scene–area pairs (${fmt(totals.unique_scene_count)} unique scenes).\nGeometric estimate: ${fmt(totals.estimated_km2, 3)} km², including repeated reference images.\n\nActual usage depends on your Planet agreement. Submitted orders may continue even if you stop local processing.`;
     if (!window.confirm(message)) return;
     action(async () => { await api("/api/confirm", { method: "POST", body: { job_id: state.job.id, confirmed: true } }); renderJob({ ...state.job, status: "running" }); startPolling(); });
   });
 
   $("cancel-button").addEventListener("click", () => action(async () => {
     await api("/api/cancel", { method: "POST", body: {} });
-    $("job-description").textContent = "Interruzione richiesta. Attendi che l’operazione corrente termini in sicurezza.";
+    $("job-description").textContent = "Stop requested. Please wait for the current operation to finish safely.";
     startPolling();
   }));
 
   $("resume-button").addEventListener("click", () => action(async () => {
     const apiKey = requireKey(); const directory = $("resume-dir").value.trim();
-    if (!directory) throw new Error("Inserisci il percorso della cartella Planet_job_… da riprendere.");
+    if (!directory) throw new Error("Enter the path to the Planet_job_… folder you want to resume.");
     const data = await api("/api/resume", { method: "POST", body: { api_key: apiKey, job_dir: directory } });
     state.planKey = ""; state.plan = null; state.stale = false; state.applyResumedConfig = true;
     $("results").hidden = true; $("completion").hidden = true;
-    renderJob({ id: data.job_id, status: "ready", logs: ["Caricamento del piano salvato…"] }); startPolling();
+    renderJob({ id: data.job_id, status: "ready", logs: ["Loading the saved plan…"] }); startPolling();
   }));
 
   $("more-scenes").addEventListener("click", appendRows);
-  $("export-csv").addEventListener("click", () => action(async () => saveBlob(await api("/api/report", { blob: true }), "Planet_scene_pianificate.csv")));
-  $("export-plan").addEventListener("click", () => action(async () => saveBlob(await api("/api/plan", { blob: true }), "Planet_piano_download.json")));
+  $("export-csv").addEventListener("click", () => action(async () => saveBlob(await api("/api/report", { blob: true }), "Planet_planned_scenes.csv")));
+  $("export-plan").addEventListener("click", () => action(async () => saveBlob(await api("/api/plan", { blob: true }), "Planet_download_plan.json")));
   $("save-settings").addEventListener("click", () => {
     const data = { version: 1, saved_at: new Date().toISOString(), config: readConfig() };
-    saveBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "Planet_impostazioni.json");
+    saveBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "Planet_settings.json");
   });
   $("load-settings").addEventListener("click", () => $("settings-file").click());
   $("settings-file").addEventListener("change", () => action(async () => {
     const file = $("settings-file").files[0]; if (!file) return;
-    if (file.size > 1024 * 1024) throw new Error("Il file di impostazioni è troppo grande. Carica un JSON delle impostazioni, non il piano completo.");
-    let data; try { data = JSON.parse(await file.text()); } catch (_) { throw new Error("Il file selezionato non contiene JSON valido."); }
+    if (file.size > 1024 * 1024) throw new Error("The settings file is too large. Upload a settings JSON file, not the full plan.");
+    let data; try { data = JSON.parse(await file.text()); } catch (_) { throw new Error("The selected file does not contain valid JSON."); }
     applyConfig(data.config || data); state.vectorId = null; markDirty();
     $("settings-file").value = "";
-    $("vector-status").textContent = "Impostazioni caricate. Seleziona o rileggi il file vettoriale; la chiave API non viene caricata dal file.";
+    $("vector-status").textContent = "Settings loaded. Select or reload the vector dataset. The API key is not loaded from the file.";
   }));
 
   async function init() {

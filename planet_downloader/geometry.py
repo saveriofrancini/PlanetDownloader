@@ -58,28 +58,28 @@ def as_geojson(geom) -> dict:
     return json.loads(json.dumps(mapping(geom), allow_nan=False))
 
 
-def validate_polygon(geom, label: str = "Geometria", minimum_rings: bool = False):
+def validate_polygon(geom, label: str = "Geometry", minimum_rings: bool = False):
     geom = force_2d(geom)
     if not isinstance(geom, (Polygon, MultiPolygon)) or geom.is_empty:
-        raise ValueError(f"{label}: sono ammessi soltanto Polygon e MultiPolygon non vuoti.")
+        raise ValueError(f"{label}: only non-empty Polygon and MultiPolygon geometries are supported.")
     if not geom.is_valid:
-        raise ValueError(f"{label}: geometria non valida ({explain_validity(geom)}). Correggere il vettore in QGIS.")
+        raise ValueError(f"{label}: invalid geometry ({explain_validity(geom)}). Repair the vector file in QGIS.")
     bounds = geom.bounds
     if not all(math.isfinite(x) for x in bounds):
-        raise ValueError(f"{label}: coordinate non finite.")
+        raise ValueError(f"{label}: coordinates are not finite.")
     if bounds[0] < -180 or bounds[2] > 180 or bounds[1] < -90 or bounds[3] > 90:
-        raise ValueError(f"{label}: coordinate fuori dall'intervallo WGS84; controllare il CRS del vettore.")
+        raise ValueError(f"{label}: coordinates are outside WGS84 bounds; check the vector CRS.")
     if bounds[2] - bounds[0] > 180:
-        raise ValueError(f"{label}: geometrie attraverso l'antimeridiano non supportate; dividerle prima del caricamento.")
+        raise ValueError(f"{label}: geometries crossing the antimeridian are not supported; split them before loading.")
     if area_km2(geom) <= 0:
-        raise ValueError(f"{label}: superficie geografica nulla.")
+        raise ValueError(f"{label}: geographic area is zero.")
     if minimum_rings:
         for part in polygons(geom):
             if area_km2(part) * 1_000_000 < 1.0 - 1e-6:
-                raise ValueError(f"{label}: una componente è inferiore a 1 m², limite del ritaglio Planet.")
+                raise ValueError(f"{label}: a component is smaller than the 1 m² Planet clipping limit.")
             for ring in part.interiors:
                 if area_km2(Polygon(ring)) * 1_000_000 < 1.0 - 1e-6:
-                    raise ValueError(f"{label}: un foro è inferiore a 1 m², limite del ritaglio Planet.")
+                    raise ValueError(f"{label}: a hole is smaller than the 1 m² Planet clipping limit.")
     return geom
 
 
@@ -91,27 +91,27 @@ def load_areas(path: str, layer: str = "", name_field: str = "") -> list[dict]:
     """Each feature remains independent; no union, simplification, or hole removal."""
     source = Path(path)
     if source.suffix.lower() not in {".shp", ".gpkg", ".geojson", ".json"}:
-        raise ValueError("Formato non supportato. Usare Shapefile, GeoPackage o GeoJSON.")
+        raise ValueError("Unsupported format. Use Shapefile, GeoPackage, or GeoJSON.")
     available = list_layers(str(source))
     if layer and layer not in available:
-        raise ValueError(f"Layer '{layer}' non trovato. Layer disponibili: {', '.join(available)}")
+        raise ValueError(f"Layer '{layer}' not found. Available layers: {', '.join(available)}")
     if not layer and len(available) > 1:
-        raise ValueError(f"Il file contiene più layer: scegliere uno fra {', '.join(available)}")
+        raise ValueError(f"The file contains multiple layers; select one of: {', '.join(available)}")
     frame = gpd.read_file(source, layer=layer or (available[0] if available else None), engine="pyogrio")
     if frame.crs is None:
-        raise ValueError("CRS assente: definire il sistema di riferimento nel vettore (per Shapefile includere il .prj).")
+        raise ValueError("Missing CRS: define the vector coordinate reference system (include the .prj file for Shapefiles).")
     CRS.from_user_input(frame.crs)  # Fail before trying any coordinate conversion.
     if name_field and name_field not in frame.columns:
-        raise ValueError(f"Campo nome '{name_field}' non trovato. Campi: {', '.join(str(c) for c in frame.columns if c != frame.geometry.name)}")
+        raise ValueError(f"Name field '{name_field}' not found. Fields: {', '.join(str(c) for c in frame.columns if c != frame.geometry.name)}")
     if frame.empty:
-        raise ValueError("Il layer non contiene aree.")
+        raise ValueError("The layer contains no areas.")
     frame = frame.to_crs(epsg=4326)
     result = []
     for number, (_, row) in enumerate(frame.iterrows(), start=1):
         geom = row.geometry
         if geom is None:
-            raise ValueError(f"Elemento {number}: geometria assente.")
-        geom = validate_polygon(geom, f"Elemento {number}", minimum_rings=True)
+            raise ValueError(f"Feature {number}: missing geometry.")
+        geom = validate_polygon(geom, f"Feature {number}", minimum_rings=True)
         raw_name = row[name_field] if name_field else f"Area {number:03d}"
         name = str(raw_name).strip() if raw_name is not None else ""
         if not name or name.lower() in {"nan", "none", "<na>"}:
@@ -132,7 +132,7 @@ def split_for_clip(geom, max_vertices: int = MAX_CLIP_VERTICES) -> list:
     silently changing the user's area. Shared edges have zero area.
     """
     if max_vertices < 8:
-        raise ValueError("Limite vertici troppo piccolo.")
+        raise ValueError("The vertex limit is too small.")
     geom = polygonal(geom)
     if geom.is_empty:
         return []
@@ -141,11 +141,11 @@ def split_for_clip(geom, max_vertices: int = MAX_CLIP_VERTICES) -> list:
     while pending:
         candidate, depth = pending.pop()
         if vertex_count(candidate) <= max_vertices:
-            validate_polygon(candidate, "Zona di ritaglio", minimum_rings=True)
+            validate_polygon(candidate, "Clipping zone", minimum_rings=True)
             result.append(candidate)
             continue
         if depth >= 30 or len(result) + len(pending) > 10000:
-            raise ValueError("Geometria troppo complessa per il ritaglio Planet: suddividere il vettore in aree più semplici.")
+            raise ValueError("Geometry is too complex for Planet clipping; split the vector into simpler areas.")
         # Components already disjoint can be separated without adding vertices.
         if isinstance(candidate, MultiPolygon):
             pending.extend((part, depth + 1) for part in reversed(list(candidate.geoms)))
@@ -160,6 +160,6 @@ def split_for_clip(geom, max_vertices: int = MAX_CLIP_VERTICES) -> list:
         pieces = [polygonal(candidate.intersection(bounds)) for bounds in boxes]
         pieces = [piece for piece in pieces if not piece.is_empty]
         if len(pieces) < 2:
-            raise ValueError("Impossibile suddividere la geometria senza alterarla; correggere il vettore.")
+            raise ValueError("Cannot split the geometry without changing it; repair the vector file.")
         pending.extend((piece, depth + 1) for piece in reversed(pieces))
     return sorted(result, key=lambda g: (g.bounds, g.wkb_hex))

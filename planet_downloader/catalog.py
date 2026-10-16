@@ -16,10 +16,10 @@ from shapely.ops import transform, unary_union
 from .geometry import area_km2, as_geojson, polygonal, polygons, split_for_clip, validate_polygon
 
 PRODUCTS = {
-    "ps_sr_4b": {"label": "PlanetScope · riflettanza superficiale · 4 bande", "item_type": "PSScene", "bundle": "analytic_sr_udm2", "asset": "ortho_analytic_4b_sr", "mask_asset": "ortho_udm2", "bands": 4, "resolution": 3.0},
-    "ps_sr_8b": {"label": "PlanetScope · riflettanza superficiale · 8 bande", "item_type": "PSScene", "bundle": "analytic_8b_sr_udm2", "asset": "ortho_analytic_8b_sr", "mask_asset": "ortho_udm2", "bands": 8, "resolution": 3.0},
-    "ps_radiance_4b": {"label": "PlanetScope · radianza · 4 bande", "item_type": "PSScene", "bundle": "analytic_udm2", "asset": "ortho_analytic_4b", "mask_asset": "ortho_udm2", "bands": 4, "resolution": 3.0},
-    "ps_radiance_8b": {"label": "PlanetScope · radianza · 8 bande", "item_type": "PSScene", "bundle": "analytic_8b_udm2", "asset": "ortho_analytic_8b", "mask_asset": "ortho_udm2", "bands": 8, "resolution": 3.0},
+    "ps_sr_4b": {"label": "PlanetScope · surface reflectance · 4 bands", "item_type": "PSScene", "bundle": "analytic_sr_udm2", "asset": "ortho_analytic_4b_sr", "mask_asset": "ortho_udm2", "bands": 4, "resolution": 3.0},
+    "ps_sr_8b": {"label": "PlanetScope · surface reflectance · 8 bands", "item_type": "PSScene", "bundle": "analytic_8b_sr_udm2", "asset": "ortho_analytic_8b_sr", "mask_asset": "ortho_udm2", "bands": 8, "resolution": 3.0},
+    "ps_radiance_4b": {"label": "PlanetScope · radiance · 4 bands", "item_type": "PSScene", "bundle": "analytic_udm2", "asset": "ortho_analytic_4b", "mask_asset": "ortho_udm2", "bands": 4, "resolution": 3.0},
+    "ps_radiance_8b": {"label": "PlanetScope · radiance · 8 bands", "item_type": "PSScene", "bundle": "analytic_8b_udm2", "asset": "ortho_analytic_8b", "mask_asset": "ortho_udm2", "bands": 8, "resolution": 3.0},
 }
 PUBLIC_CONFIG_KEYS = {
     "product", "start_date", "end_date", "cloud_scene_max", "aoi_cloud_max", "aoi_clear_min",
@@ -38,7 +38,7 @@ PROPERTY_KEYS = {
 
 def _check_cancel(client, cancel):
     if cancel is not None and cancel.is_set():
-        raise InterruptedError("Operazione interrotta dall'utente.")
+        raise InterruptedError("Operation stopped by the user.")
     if hasattr(client, "check_cancel"):
         client.check_cancel()
 
@@ -47,10 +47,10 @@ def utc_date_bounds(start_date: str, end_date: str) -> tuple[datetime, datetime]
     """Inclusive calendar dates as [start, midnight after end) in UTC."""
     if not all(isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)
                for value in (start_date, end_date)):
-        raise ValueError("Le date devono essere nel formato AAAA-MM-GG.")
+        raise ValueError("Dates must use the YYYY-MM-DD format.")
     start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
     if end < start:
-        raise ValueError("La data finale precede quella iniziale.")
+        raise ValueError("The end date is before the start date.")
     return (datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc),
             datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc))
 
@@ -175,7 +175,7 @@ def _repair_partition(assignments, footprints, cancel=None):
     seen = set()
     for attempt in range(max(64, 16 * len(assignments))):
         if cancel is not None and cancel.is_set():
-            raise InterruptedError("Operazione interrotta dall'utente.")
+            raise InterruptedError("Operation stopped by the user.")
         issue = next(((entry, kind, region) for entry in assignments
                       for kind, region in _small_partition_regions(entry["geometry"])), None)
         if issue is None:
@@ -220,9 +220,9 @@ def _repair_partition(assignments, footprints, cancel=None):
             if donor is not receiver:
                 donor["geometry"] = polygonal(donor["geometry"].difference(grown))
     raise ValueError(
-        "Residuo della partizione inferiore a 1 m²: non è possibile assegnarlo "
-        "a un riferimento con un ritaglio Planet valido senza alterare la copertura. "
-        "Suddividere diversamente l'area di studio o ampliare leggermente il vettore.")
+        "Partition residual smaller than 1 m²: it cannot be assigned "
+        "to a reference with a valid Planet clip without changing coverage. "
+        "Partition the study area differently or slightly expand the vector boundary.")
 
 
 def plan_zones(area_geometry: dict, scenes: list[dict], cancel=None) -> list[dict]:
@@ -240,12 +240,12 @@ def plan_zones(area_geometry: dict, scenes: list[dict], cancel=None) -> list[dic
     ranked = sorted(scenes, key=_anchor_rank)
     while not remaining.is_empty:
         if cancel is not None and cancel.is_set():
-            raise InterruptedError("Operazione interrotta dall'utente.")
+            raise InterruptedError("Operation stopped by the user.")
         candidates = [(area_km2(footprints[scene["id"]].intersection(remaining)), index, scene)
                       for index, scene in enumerate(ranked)]
         coverage, _, anchor = max(candidates, key=lambda row: (row[0], -row[1]))
         if coverage <= 0:
-            raise ValueError("Impossibile partizionare tutta la superficie disponibile per la coregistrazione.")
+            raise ValueError("Cannot partition the entire available area for coregistration.")
         covered = polygonal(footprints[anchor["id"]].intersection(remaining))
         assignments.append({"anchor_id": anchor["id"], "geometry": covered})
         # Subtract the original footprint, not its freshly intersected copy:
@@ -254,7 +254,7 @@ def plan_zones(area_geometry: dict, scenes: list[dict], cancel=None) -> list[dic
         remaining = polygonal(remaining.difference(footprints[anchor["id"]]))
         ranked = [scene for scene in ranked if scene["id"] != anchor["id"]]
         if not ranked and not remaining.is_empty:
-            raise ValueError("Residui geometrici nella partizione: controllare le geometrie del vettore.")
+            raise ValueError("Geometric residuals in the partition: check the vector geometries.")
     assignments = _repair_partition(assignments, footprints, cancel)
     zones = []
     for assignment in assignments:
@@ -273,7 +273,7 @@ def plan_orders(area_id: str, zones: list[dict], scenes: list[dict], config: dic
     product = PRODUCTS[config["product"]]
     batch_size = int(config.get("batch_size", 100))
     if not 1 <= batch_size <= 499:
-        raise ValueError("Il lotto deve contenere da 1 a 499 immagini, oltre al riferimento fisso.")
+        raise ValueError("A batch must contain 1 to 499 images in addition to the fixed reference.")
     geometries = {scene["id"]: shape(scene["geometry"]) for scene in scenes}
     orders = []
     for zone in zones:
@@ -307,7 +307,7 @@ def _primed_candidates(client, candidates, item_type, band, emit, cancel):
     for offset in range(0, len(candidates), 8):
         batch = candidates[offset:offset + 8]
         if band is not None and callable(prime):
-            emit(f"Avvio UDM2 per le immagini {offset + 1}–{offset + len(batch)}/{len(candidates)}.")
+            emit(f"Starting UDM2 for images {offset + 1}–{offset + len(batch)}/{len(candidates)}.")
             for item_id, _, _, _, intersection, _, _ in batch:
                 _check_cancel(client, cancel)
                 prime(item_type, item_id, as_geojson(intersection), band, cancel)
@@ -317,23 +317,23 @@ def _primed_candidates(client, candidates, item_type, band, emit, cancel):
 def build_plan(client, areas: list[dict], config: dict, emit=lambda _: None, cancel=None) -> dict:
     config = {key: deepcopy(value) for key, value in config.items() if key in PUBLIC_CONFIG_KEYS}
     if config.get("product") not in PRODUCTS:
-        raise ValueError("Prodotto non supportato.")
+        raise ValueError("Unsupported product.")
     start, stop = utc_date_bounds(config["start_date"], config["end_date"])
     product = PRODUCTS[config["product"]]
     asset_cache = {}
     unique_footprints = {}
     clipped_by_scene = {}
     area_plans = []
-    warnings = ["La stima in km² è geometrica: il consumo effettivo dipende dal contratto Planet e dalle regole di addebito. Include i riferimenti ripetuti nei lotti.",
-                "La coregistrazione è verificata dopo il download: immagini non allineate da Planet vengono escluse dai mosaici e segnalate."]
+    warnings = ["The km² estimate is geometric: actual consumption depends on the Planet contract and billing rules. Repeated references in separate batches are included.",
+                "Coregistration is checked after download: images not aligned by Planet are excluded from mosaics and reported."]
     if config.get("aoi_cloud_max") is not None or config.get("aoi_clear_min") is not None:
-        warnings.append("I filtri sull'area usano UDM2 sulla sola intersezione scena–area; la ricerca può attivare le maschere UDM2 e richiedere alcuni minuti.")
+        warnings.append("AOI filters use UDM2 only over the scene–area intersection; searching may activate UDM2 masks and take several minutes.")
     for area_index, original_area in enumerate(areas, start=1):
         _check_cancel(client, cancel)
         area = {key: deepcopy(original_area[key]) for key in ("id", "name", "geometry", "area_km2")}
         geometry = validate_polygon(shape(area["geometry"]), f"Area {area['name']}", minimum_rings=True)
         area["area_km2"] = area_km2(geometry)
-        emit(f"Ricerca area {area_index}/{len(areas)}: {area['name']}.")
+        emit(f"Searching area {area_index}/{len(areas)}: {area['name']}.")
         scenes, area_warnings, seen = [], [], set()
         candidates = []
         discarded = Counter()
@@ -341,7 +341,7 @@ def build_plan(client, areas: list[dict], config: dict, emit=lambda _: None, can
             _check_cancel(client, cancel)
             item_id = feature.get("id")
             if not isinstance(item_id, str) or not item_id or len(item_id) > 150 or not re.fullmatch(r"[a-zA-Z0-9_-]+", item_id):
-                discarded["metadati non validi"] += 1
+                discarded["invalid metadata"] += 1
                 continue
             if item_id in seen:
                 continue
@@ -350,25 +350,25 @@ def build_plan(client, areas: list[dict], config: dict, emit=lambda _: None, can
             try:
                 acquired = datetime.fromisoformat(str(props["acquired"]).replace("Z", "+00:00"))
                 if acquired.tzinfo is None:
-                    raise ValueError("Timestamp senza fuso")
+                    raise ValueError("Timestamp without a time zone")
                 acquired = acquired.astimezone(timezone.utc)
-                footprint = validate_polygon(shape(feature["geometry"]), "Footprint scena")
+                footprint = validate_polygon(shape(feature["geometry"]), "Scene footprint")
             except (ValueError, KeyError, TypeError):
-                discarded["geometria o data non valida"] += 1
+                discarded["invalid geometry or date"] += 1
                 continue
             if not start <= acquired < stop or not _local_properties_match(props, config):
-                discarded["filtri scena"] += 1
+                discarded["scene filters"] += 1
                 continue
             intersection = polygonal(geometry.intersection(footprint))
             intersect_km2 = area_km2(intersection)
             cover = min(100.0, 100 * intersect_km2 / area["area_km2"])
             if intersect_km2 <= 0 or cover + 1e-8 < float(config.get("coverage_min", 0)):
-                discarded["copertura geometrica"] += 1
+                discarded["geometric coverage"] += 1
                 continue
             if item_id not in asset_cache:
                 asset_cache[item_id] = client.item_assets(product["item_type"], item_id)
             if not _assets_allowed(asset_cache[item_id], feature, product):
-                discarded["asset mancanti o non autorizzati"] += 1
+                discarded["missing or unauthorized assets"] += 1
                 continue
             candidates.append((item_id, props, acquired, footprint, intersection, intersect_km2, cover))
         first_band = ("cloud" if config.get("aoi_cloud_max") is not None else
@@ -378,20 +378,20 @@ def build_plan(client, areas: list[dict], config: dict, emit=lambda _: None, can
             _check_cancel(client, cancel)
             aoi_cloud, aoi_clear = None, None
             if config.get("aoi_cloud_max") is not None:
-                emit(f"{area['name']}: nuvole UDM2 su area, scena {item_id}.")
+                emit(f"{area['name']}: UDM2 cloud coverage over the AOI, scene {item_id}.")
                 aoi_cloud = _number(client.coverage(product["item_type"], item_id, as_geojson(intersection), "cloud", cancel))
                 if aoi_cloud is None or not 0 <= aoi_cloud <= 100:
-                    raise ValueError(f"Scena {item_id}: percentuale nuvole UDM2 non valida; ricerca non completata.")
+                    raise ValueError(f"Scene {item_id}: invalid UDM2 cloud percentage; search incomplete.")
                 if aoi_cloud > float(config["aoi_cloud_max"]):
-                    discarded["nuvole su area"] += 1
+                    discarded["AOI cloud coverage"] += 1
                     continue
             if config.get("aoi_clear_min") is not None:
-                emit(f"{area['name']}: pixel chiari UDM2 su area, scena {item_id}.")
+                emit(f"{area['name']}: UDM2 clear pixels over the AOI, scene {item_id}.")
                 aoi_clear = _number(client.coverage(product["item_type"], item_id, as_geojson(intersection), "clear", cancel))
                 if aoi_clear is None or not 0 <= aoi_clear <= 100:
-                    raise ValueError(f"Scena {item_id}: percentuale pixel chiari UDM2 non valida; ricerca non completata.")
+                    raise ValueError(f"Scene {item_id}: invalid UDM2 clear percentage; search incomplete.")
                 if aoi_clear < float(config["aoi_clear_min"]):
-                    discarded["pixel chiari su area"] += 1
+                    discarded["AOI clear pixels"] += 1
                     continue
             cloud_cover = _number(props.get("cloud_cover"))
             safe_props = {key: value for key, value in props.items()
@@ -407,13 +407,13 @@ def build_plan(client, areas: list[dict], config: dict, emit=lambda _: None, can
             clipped_by_scene.setdefault(item_id, []).append(intersection)
         scenes.sort(key=lambda scene: (scene["acquired"], scene["id"]))
         if discarded:
-            area_warnings.append("Scene escluse: " + "; ".join(f"{reason}: {count}" for reason, count in sorted(discarded.items())) + ".")
+            area_warnings.append("Excluded scenes: " + "; ".join(f"{reason}: {count}" for reason, count in sorted(discarded.items())) + ".")
         if not scenes:
-            area_warnings.append("Nessuna immagine autorizzata soddisfa tutti i filtri per questa area.")
-        emit(f"{area['name']}: {len(scenes)} immagini ammesse; preparo i riferimenti fissi e la stima.")
+            area_warnings.append("No authorized images satisfy all filters for this area.")
+        emit(f"{area['name']}: {len(scenes)} eligible images; preparing fixed references and the estimate.")
         zones = plan_zones(area["geometry"], scenes, cancel)
         if len({zone["anchor_id"] for zone in zones}) > 1:
-            area_warnings.append("L'area richiede più riferimenti: viene divisa in zone senza sovrapposizione, ciascuna con un riferimento fisso. L'allineamento fra zone diverse non è garantito da Planet.")
+            area_warnings.append("The area requires multiple references: it is divided into non-overlapping zones, each with a fixed reference. Planet does not guarantee alignment between zones.")
         orders = plan_orders(area["id"], zones, scenes, config)
         area.update({"scenes": scenes, "zones": zones, "orders": orders, "warnings": area_warnings,
                      "available_coverage_percent": min(100.0, 100 * area_km2(unary_union([shape(z["geometry"]) for z in zones])) / area["area_km2"]) if zones else 0.0})

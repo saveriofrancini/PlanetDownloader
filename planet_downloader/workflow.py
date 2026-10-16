@@ -32,19 +32,19 @@ def fingerprint(data):
 def safe_path(root, relative):
     """Reject POSIX traversal, Windows ADS/reserved names, and existing symlinks."""
     if not isinstance(relative, str) or not relative or '\\' in relative:
-        raise PlanetError('Nome file ricevuto non sicuro.')
+        raise PlanetError('Unsafe filename received.')
     raw_parts = relative.split('/')
     reserved = {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{x}' for x in range(1, 10)), *(f'LPT{x}' for x in range(1, 10))}
     if any(not p or p in ('.', '..') or p.endswith((' ', '.')) or
            any(c in p for c in '<>:"|?*\x00') or any(ord(c) < 32 for c in p) or
            p.split('.')[0].upper() in reserved for p in raw_parts):
-        raise PlanetError('Percorso file ricevuto non sicuro.')
+        raise PlanetError('Unsafe file path received.')
     root = Path(root).resolve()
     target = root.joinpath(*PurePosixPath(relative).parts)
     try:
         target.resolve().relative_to(root)
     except ValueError:
-        raise PlanetError('Percorso file esterno alla cartella di lavoro.') from None
+        raise PlanetError('File path is outside the job folder.') from None
     return target
 
 
@@ -88,9 +88,9 @@ def reconcile(client, payload):
         if _order_matches(detail, payload):
             matches.append(detail)
         else:
-            raise PlanetError('Esiste un ordine con lo stesso nome ma parametri diversi. Verificare nell’account Planet.')
+            raise PlanetError('An order with the same name has different parameters. Check your Planet account.')
     if len(matches) > 1:
-        raise PlanetError('Più ordini corrispondono allo stesso invio. Verificare gli identificativi su Planet prima di riprendere.')
+        raise PlanetError('Multiple orders match the same submission. Check the identifiers on Planet before resuming.')
     return matches[0] if matches else None
 
 
@@ -98,7 +98,7 @@ def _get_or_create(client, payload, entry, save, emit):
     if entry.get('order_id'):
         return client.get_order(entry['order_id'])
     if entry.get('submission') in ('intent', 'ambiguous'):
-        emit('Riconciliazione di un precedente invio senza risposta certa…')
+        emit('Reconciling a previous submission with an uncertain outcome…')
         order = reconcile(client, payload)
         if order:
             entry.update(order_id=order['id'], submission='accepted')
@@ -107,10 +107,10 @@ def _get_or_create(client, payload, entry, save, emit):
         entry['submission'] = 'ambiguous'
         save()
         raise AmbiguousSubmission(
-            'Invio precedente con esito incerto, non ancora trovato nella lista ordini Planet. '
-            'Nessun ordine duplicato è stato creato. Attendere e usare Riprendi; se persiste, '
-            f'verificare su Planet l’ordine «{payload["name"]}». Gli ordini più vecchi di tre mesi '
-            'possono richiedere il supporto Planet. Non avviare una nuova ricerca per aggirare il controllo.')
+            'A previous submission has an uncertain outcome and is not yet in the Planet order list. '
+            'No duplicate order was created. Wait and use Resume; if this persists, '
+            f'check order «{payload["name"]}» on Planet. Orders older than three months '
+            'may require Planet support. Do not start a new search to bypass this check.')
     entry.update(submission='intent', name=payload['name'], payload_hash=fingerprint(payload),
                  intent_at=datetime.now(timezone.utc).isoformat())
     save()  # Must reach disk BEFORE the potentially chargeable POST.
@@ -122,8 +122,8 @@ def _get_or_create(client, payload, entry, save, emit):
         order = reconcile(client, payload)
         if order is None:
             raise AmbiguousSubmission(
-                'Planet potrebbe aver accettato l’ordine, ma non è ancora visibile. Nessun reinvio automatico. '
-                f'Usare Riprendi più tardi e verificare il nome «{payload["name"]}» su Planet.') from None
+                'Planet may have accepted the order, but it is not yet visible. No automatic resubmission. '
+                f'Use Resume later and check the name «{payload["name"]}» on Planet.') from None
     except PlanetError:
         # A definite HTTP rejection is safe to try again after explicit resume confirmation.
         entry['submission'] = 'rejected'
@@ -144,16 +144,16 @@ def _poll(client, order, entry, save, emit):
         save()
         now = time.monotonic()
         if status != last:
-            emit(f'Ordine {order["id"]}: {status}.')
+            emit(f'Order {order["id"]}: {status}.')
             last = status
             last_progress = now
         if status in {'success', 'partial', 'failed', 'cancelled'}:
             return order
         if status not in {'queued', 'running', 'initializing', 'processing'}:
-            raise PlanetError(f'Stato Planet non riconosciuto: {safe_message(status)}.')
+            raise PlanetError(f'Unrecognized Planet state: {safe_message(status)}.')
         if now - last_progress >= 60:
-            emit(f'Ordine {order["id"]}: ancora {status}, '
-                 f'attesa da {int(now - started)} s.')
+            emit(f'Order {order["id"]}: still {status}, '
+                 f'waiting for {int(now - started)} s.')
             last_progress = now
         client.wait(getattr(client, 'poll_interval', 10))
         order = client.get_order(order['id'])
@@ -167,7 +167,7 @@ def _result_map(order):
             continue
         name = _relative_name(result['name'], order['id'])
         if name in mapped:
-            raise PlanetError('Planet ha restituito due file con lo stesso percorso.')
+            raise PlanetError('Planet returned two files with the same path.')
         mapped[name] = result
     return mapped
 
@@ -183,7 +183,7 @@ def _download_order(client, order, folder, entry, save, emit):
         for refresh in range(2):
             result = result_map.get(name)
             if result is None:
-                raise PlanetError(f'Link di consegna mancante per {name}.')
+                raise PlanetError(f'Missing delivery link for {name}.')
             try:
                 info = client.download(result['location'], path, expected, downloads.get(name))
                 downloads[name] = info
@@ -192,13 +192,13 @@ def _download_order(client, order, folder, entry, save, emit):
             except DownloadExpired:
                 if refresh:
                     raise
-                emit('Aggiornamento dei link di download scaduti…')
+                emit('Refreshing expired download links…')
                 order = client.get_order(order['id'])
                 result_map = _result_map(order)
 
     manifest_names = [n for n in result_map if PurePosixPath(n).name == 'manifest.json']
     if len(manifest_names) != 1:
-        raise PlanetError('Manifesto ordine assente o ambiguo: riprendere il lavoro più tardi.')
+        raise PlanetError('Order manifest missing or ambiguous: resume the job later.')
     manifest_name = manifest_names[0]
     manifest_path = download_one(manifest_name)
     try:
@@ -207,14 +207,14 @@ def _download_order(client, order, folder, entry, save, emit):
         if not isinstance(manifest_files, list):
             raise ValueError
     except (ValueError, KeyError, TypeError):
-        raise PlanetError('Manifesto Planet non valido.') from None
+        raise PlanetError('Invalid Planet manifest.') from None
     base = PurePosixPath(manifest_name).parent
     manifest_by_name = {}
     for item in manifest_files:
         name = str(base / item['path'])
         safe_path(folder, name)
         if name in manifest_by_name:
-            raise PlanetError('Percorsi duplicati nel manifesto Planet.')
+            raise PlanetError('Duplicate paths in the Planet manifest.')
         manifest_by_name[name] = item
     # Retain every delivered asset, including sidecars and files not annotated in the manifest.
     all_names = sorted(set(result_map) | set(manifest_by_name))
@@ -223,7 +223,7 @@ def _download_order(client, order, folder, entry, save, emit):
         client.check_cancel()
         if name == manifest_name:
             continue
-        emit(f'Verifica/download file {index}/{len(all_names)}: {PurePosixPath(name).name}')
+        emit(f'Checking/downloading file {index}/{len(all_names)}: {PurePosixPath(name).name}')
         info = manifest_by_name.get(name, {})
         path = download_one(name, info)
         files.append({'path': str(path), 'relative': name, 'annotations': info.get('annotations') or {}})
@@ -255,11 +255,11 @@ def _records_for_order(area, spec, files, config):
             elif suffix == '.json' and 'coreg' in basename:
                 qualities.append(file['path'])
         if len(images) != 1 or len(masks) != 1:
-            failures.append({'scene_id': scene_id, 'zone_id': spec['zone_id'], 'reason': 'Immagine o UDM2 mancante/ambiguo nella consegna.'})
+            failures.append({'scene_id': scene_id, 'zone_id': spec['zone_id'], 'reason': 'Image or UDM2 missing or ambiguous in the delivery.'})
             continue
         is_anchor = scene_id == spec['anchor_id']
         if not is_anchor and not ('_coreg' in Path(images[0]).stem.lower() and '_coreg' in Path(masks[0]).stem.lower()):
-            failures.append({'scene_id': scene_id, 'zone_id': spec['zone_id'], 'reason': 'Coregistrazione non riuscita: asset conservati, esclusi dai mosaici.'})
+            failures.append({'scene_id': scene_id, 'zone_id': spec['zone_id'], 'reason': 'Coregistration failed: assets retained but excluded from mosaics.'})
             continue
         scene = scenes[scene_id]
         record = {key: scene.get(key) for key in ('acquired', 'date', 'cloud_percent', 'clear_percent')}
@@ -268,7 +268,7 @@ def _records_for_order(area, spec, files, config):
         if qualities:
             record['quality_path'] = sorted(qualities)[0]
         elif not is_anchor:
-            warnings.append(f'{scene_id}: rapporto qualità coregistrazione non trovato; suffissi _coreg presenti su immagine e maschera.')
+            warnings.append(f'{scene_id}: coregistration quality report not found; image and mask both have _coreg suffixes.')
         records.append(record)
     return records, failures, warnings
 
@@ -279,14 +279,14 @@ def process_plan(client, plan, job_dir, emit, cancel):
     job_dir = Path(job_dir).resolve()
     plan_path, state_path = job_dir / 'plan.json', job_dir / 'state.json'
     if not plan_path.is_file():
-        raise PlanetError('Piano salvato mancante. Ripetere ricerca e conferma dalla GUI.')
+        raise PlanetError('Saved plan missing. Repeat the search and confirmation in the GUI.')
     saved_plan = json.loads(plan_path.read_text(encoding='utf-8'))
     if fingerprint(saved_plan) != fingerprint(plan):
-        raise PlanetError('Il piano è cambiato dopo il riepilogo; ripetere ricerca e conferma.')
+        raise PlanetError('The plan changed after the summary; repeat the search and confirmation.')
     state = json.loads(state_path.read_text(encoding='utf-8')) if state_path.exists() else {
         'version': 1, 'plan_hash': fingerprint(plan), 'orders': {}, 'confirmed': True}
     if state.get('plan_hash') != fingerprint(plan):
-        raise PlanetError('Stato di ripresa incompatibile con il piano salvato.')
+        raise PlanetError('Resume state is incompatible with the saved plan.')
     state.setdefault('orders', {})
     def save():
         state['updated_at'] = datetime.now(timezone.utc).isoformat()
@@ -296,7 +296,7 @@ def process_plan(client, plan, job_dir, emit, cancel):
                'warnings': list(plan.get('warnings', [])), 'failed': [], 'outputs': []}
     for area in plan['areas']:
         client.check_cancel()
-        emit(f'Area: {area["name"]}. Elaborazione di {len(area["orders"])} ordini.')
+        emit(f'Area: {area["name"]}. Processing {len(area["orders"])} orders.')
         by_pair, candidate_failures = {}, []
         for spec in area['orders']:
             client.check_cancel()
@@ -304,14 +304,14 @@ def process_plan(client, plan, job_dir, emit, cancel):
             entry = state['orders'].setdefault(state_key, {'files': {}})
             payload = spec['payload']
             if entry.get('payload_hash') and entry['payload_hash'] != fingerprint(payload):
-                raise PlanetError('Parametri di un ordine modificati rispetto allo stato di ripresa.')
+                raise PlanetError('Order parameters differ from the saved resume state.')
             try:
                 order = _get_or_create(client, payload, entry, save, emit)
                 order = _poll(client, order, entry, save, emit)
                 if order['state'] in {'failed', 'cancelled'}:
-                    raise PlanetError(f'Ordine {order["id"]} {order["state"]}: {safe_message(order.get("error_hints", []))}')
+                    raise PlanetError(f'Order {order["id"]} {order["state"]}: {safe_message(order.get("error_hints", []))}')
                 if order['state'] == 'partial':
-                    summary['warnings'].append(f'Ordine {order["id"]}: consegna parziale Planet.')
+                    summary['warnings'].append(f'Order {order["id"]}: partial Planet delivery.')
                     summary['status'] = 'partial'
                 folder = safe_path(job_dir / 'orders', area['id'] + '_' + spec['key'])
                 files = _download_order(client, order, folder, entry, save, emit)
@@ -327,7 +327,7 @@ def process_plan(client, plan, job_dir, emit, cancel):
                 raise
             except (PlanetError, OSError, ValueError) as exc:
                 error = safe_message(exc)
-                emit(f'Ordine incompleto: {error}')
+                emit(f'Incomplete order: {error}')
                 entry['error'] = error
                 save()
                 summary['failed'].append({'area_id': area['id'], 'order_key': spec['key'], 'reason': error})
@@ -336,8 +336,8 @@ def process_plan(client, plan, job_dir, emit, cancel):
         reasons = {(f['zone_id'], f['scene_id']): f['reason'] for f in candidate_failures}
         missing = expected - set(by_pair)
         for zone_id, scene_id in sorted(missing):
-            reason = reasons.get((zone_id, scene_id), 'Scena non consegnata o download non completato.')
-            emit(f'ESCLUSA {scene_id}, zona {zone_id}: {reason}')
+            reason = reasons.get((zone_id, scene_id), 'Scene not delivered or download incomplete.')
+            emit(f'EXCLUDED {scene_id}, zone {zone_id}: {reason}')
             summary['failed'].append({'area_id': area['id'], 'zone_id': zone_id, 'scene_id': scene_id, 'reason': reason})
         records = [by_pair[key] for key in sorted(by_pair)]
         try:
@@ -353,7 +353,7 @@ def process_plan(client, plan, job_dir, emit, cancel):
             raise
         except (OSError, ValueError, RuntimeError) as exc:
             error = safe_message(exc)
-            emit(f'Elaborazione area incompleta: {error}')
+            emit(f'Area processing incomplete: {error}')
             summary['failed'].append({'area_id': area['id'], 'reason': error})
     if summary['failed']:
         summary['status'] = 'partial'
@@ -361,6 +361,6 @@ def process_plan(client, plan, job_dir, emit, cancel):
     atomic_json(job_dir / 'summary.json', summary)
     state['status'] = summary['status']
     save()
-    emit('Lavoro completato.' if summary['status'] == 'complete' else
-         'Lavoro PARZIALE: consultare le esclusioni e riprendere gli ordini incompleti.')
+    emit('Job complete.' if summary['status'] == 'complete' else
+         'PARTIAL job: review excluded scenes and resume incomplete orders.')
     return summary

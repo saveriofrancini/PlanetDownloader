@@ -168,15 +168,15 @@ def test_clear_precedes_higher_confidence_haze_and_ties_deterministic(tmp_path):
 
 def test_missing_mask_unregistered_and_cancel_fail_clearly(tmp_path):
     record = source(tmp_path, "A", np.full((4, 4), 10))
-    with pytest.raises(ValueError, match="UDM2 assente"):
+    with pytest.raises(ValueError, match="Missing UDM2"):
         process_area(area(), [dict(record, mask_path="missing")], config(), tmp_path / "missing")
-    with pytest.raises(ValueError, match="non coregistrata"):
+    with pytest.raises(ValueError, match="not co-registered"):
         process_area(area(), [dict(record, coreg_status="failed")], config(), tmp_path / "failed")
     event = threading.Event()
     event.set()
     with pytest.raises(InterruptedError):
         process_area(area(), [record], config(), tmp_path / "cancelled", cancel=event)
-    with pytest.raises(ValueError, match="proiettato"):
+    with pytest.raises(ValueError, match="projected"):
         process_area(area(), [record], config(target_epsg="4326"), tmp_path / "geographic")
 
 

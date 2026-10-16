@@ -36,7 +36,7 @@ MASK_BANDS = {"snow": 2, "shadow": 3, "light_haze": 4, "heavy_haze": 5, "cloud":
 
 def _check_cancel(cancel):
     if cancel is not None and cancel.is_set():
-        raise InterruptedError("Elaborazione raster interrotta; gli originali sono conservati.")
+        raise InterruptedError("Raster processing cancelled; original files have been preserved.")
 
 
 def _write_json(path: Path, value: Any):
@@ -49,7 +49,7 @@ def _write_json(path: Path, value: Any):
 def _geometry(value):
     geom = shape(value)
     if geom.is_empty or not geom.is_valid or geom.geom_type not in {"Polygon", "MultiPolygon"}:
-        raise ValueError("Geometria AOI/zona vuota, non valida o non poligonale.")
+        raise ValueError("AOI/zone geometry is empty, invalid, or not polygonal.")
     return geom
 
 
@@ -80,24 +80,24 @@ def _project(geom, src, dst):
 def _make_grid(area_geometry, config):
     resolution = float(config.get("resolution", 3.0))
     if not math.isfinite(resolution) or resolution <= 0:
-        raise ValueError("La risoluzione deve essere un numero positivo in metri.")
+        raise ValueError("Resolution must be a positive number in metres.")
     requested = str(config.get("target_epsg") or "").strip()
     if requested:
         crs = CRS.from_user_input(requested if ":" in requested else f"EPSG:{requested}")
     else:
         center = area_geometry.centroid
         if not (-80 <= center.y <= 84):
-            raise ValueError("Fuori dai limiti UTM: scegliere un EPSG proiettato in metri.")
+            raise ValueError("Outside UTM limits: choose a projected EPSG code with metre units.")
         zone = max(1, min(60, math.floor((center.x + 180) / 6) + 1))
         crs = CRS.from_epsg((32600 if center.y >= 0 else 32700) + zone)
     if not crs.is_projected or not crs.axis_info or any(
         abs(axis.unit_conversion_factor - 1.0) > 1e-10 for axis in crs.axis_info[:2]
     ):
-        raise ValueError("Il CRS di uscita deve essere proiettato e usare metri.")
+        raise ValueError("The output CRS must be projected and use metre units.")
     projected = _project(area_geometry, "EPSG:4326", crs)
     left, bottom, right, top = projected.bounds
     if not all(math.isfinite(v) for v in projected.bounds):
-        raise ValueError("Impossibile proiettare l'area nel CRS scelto.")
+        raise ValueError("Cannot project the area into the selected CRS.")
     # Suppress sub-micrometre round-trip noise near an exact grid boundary.
     epsilon = 1e-7
     left = math.floor(left / resolution + epsilon) * resolution
@@ -107,7 +107,7 @@ def _make_grid(area_geometry, config):
     width = int(round((right - left) / resolution))
     height = int(round((top - bottom) / resolution))
     if not 0 < width < 2**31 or not 0 < height < 2**31:
-        raise ValueError("Dimensioni della griglia non supportate; suddividere l'area.")
+        raise ValueError("Unsupported grid dimensions; split the area.")
     return {
         "crs": rasterio.crs.CRS.from_wkt(crs.to_wkt()),
         "transform": from_origin(left, top, resolution, resolution),
@@ -174,23 +174,23 @@ def _prepare_source(record, zone_wgs84, config, tempdir: Path, sequence, cancel)
     image_path = Path(record["image_path"])
     mask_path = Path(record.get("mask_path") or "")
     if not image_path.is_file():
-        raise ValueError(f"Immagine assente per la scena {record['scene_id']}.")
+        raise ValueError(f"Missing image for scene {record['scene_id']}.")
     if not record.get("mask_path") or not mask_path.is_file():
-        raise ValueError(f"UDM2 assente per la scena {record['scene_id']}: mosaico sospeso.")
+        raise ValueError(f"Missing UDM2 for scene {record['scene_id']}: mosaic processing stopped.")
     confidence_min = float(config.get("confidence_min", 70))
     if not 0 <= confidence_min <= 100:
-        raise ValueError("La confidenza UDM2 deve essere compresa tra 0 e 100.")
+        raise ValueError("UDM2 confidence must be between 0 and 100.")
     classes = config.get("mask_classes", list(MASK_BANDS))
     unknown = set(classes) - set(MASK_BANDS)
     if unknown:
-        raise ValueError("Classi UDM2 sconosciute: " + ", ".join(sorted(unknown)))
+        raise ValueError("Unknown UDM2 classes: " + ", ".join(sorted(unknown)))
     clean_path = tempdir / f"source_{sequence:06d}.tif"
     score_path = tempdir / f"score_{sequence:06d}.tif"
     with rasterio.open(image_path) as src, rasterio.open(mask_path) as mask:
         if not src.crs or not mask.crs:
-            raise ValueError(f"CRS assente in immagine o UDM2: {record['scene_id']}.")
+            raise ValueError(f"Missing CRS in image or UDM2: {record['scene_id']}.")
         if mask.count < 8:
-            raise ValueError(f"La maschera di {record['scene_id']} non è UDM2 a 8 bande.")
+            raise ValueError(f"The mask for {record['scene_id']} is not an 8-band UDM2 raster.")
         source_zone = _project(zone_wgs84, "EPSG:4326", src.crs)
         try:
             crop = geometry_window(src, [mapping(source_zone)], pad_x=2, pad_y=2)
@@ -382,9 +382,9 @@ def _mosaic_date(date, prepared, grid, metadata, indices, destination, staging, 
     for filename in ("mosaic.tif", "valid_mask.tif", "provenance.tif", "metadata.json"):
         os.replace(staging / filename, destination / filename)
     if valid_pixels == 0:
-        emit(f"{date}: nessun pixel utilizzabile dopo maschere e ritaglio; file NoData conservati.")
+        emit(f"{date}: no usable pixels after masking and clipping; NoData files retained.")
     else:
-        emit(f"{date}: mosaico salvato, {result['valid_percent_aoi_pixels']:.1f}% dei pixel AOI utilizzabili.")
+        emit(f"{date}: mosaic saved, {result['valid_percent_aoi_pixels']:.1f}% of AOI pixels usable.")
     return result
 
 
@@ -409,15 +409,15 @@ def process_area(area_plan, records, config, output_dir: Path, emit=lambda messa
     for record in sorted(records, key=_sort_key):
         _check_cancel(cancel)
         if record.get("coreg_status") not in {"anchor", "coregistered"}:
-            raise ValueError(f"Scena non coregistrata: {record.get('scene_id', '?')}.")
+            raise ValueError(f"Scene is not co-registered: {record.get('scene_id', '?')}.")
         if str(record["zone_id"]) not in zones:
-            raise ValueError(f"Zona assente o vuota: {record['zone_id']}.")
+            raise ValueError(f"Missing or empty zone: {record['zone_id']}.")
         key = (str(record["zone_id"]), str(record["scene_id"]))
         if key not in unique:
             unique[key] = record
     scene_ids = sorted({record["scene_id"] for record in unique.values()})
     if len(scene_ids) >= 2**32:
-        raise ValueError("Troppi identificatori di scena per la provenance uint32.")
+        raise ValueError("Too many scene identifiers for uint32 provenance.")
     indices = {scene: index + 1 for index, scene in enumerate(scene_ids)}
     groups = defaultdict(list)
     for record in unique.values():
@@ -431,7 +431,7 @@ def process_area(area_plan, records, config, output_dir: Path, emit=lambda messa
         "status": "complete", "outputs": [],
     }
     if not groups:
-        summary["warnings"].append("Nessuna scena coregistrata disponibile per questa area.")
+        summary["warnings"].append("No co-registered scenes are available for this area.")
         summary["status"] = "partial"
         _write_json(output_dir / "summary.json", summary)
         return summary
@@ -440,7 +440,7 @@ def process_area(area_plan, records, config, output_dir: Path, emit=lambda messa
         temporary = Path(temp)
         for date, group in sorted(groups.items()):
             _check_cancel(cancel)
-            emit(f"{area_plan.get('name', area_plan['id'])}, {date}: maschera nativa e mosaico di {len(group)} scene/zone.")
+            emit(f"{area_plan.get('name', area_plan['id'])}, {date}: applying native-grid masks and mosaicking {len(group)} scene/zone pairs.")
             staging = temporary / date
             staging.mkdir()
             prepared = []
@@ -448,17 +448,17 @@ def process_area(area_plan, records, config, output_dir: Path, emit=lambda messa
                 item = _prepare_source(record, zones[str(record["zone_id"])], config,
                                        staging, sequence, cancel)
                 if item is None:
-                    summary["warnings"].append(f"{record['scene_id']}: raster privo di sovrapposizione con la zona.")
+                    summary["warnings"].append(f"{record['scene_id']}: raster does not overlap the zone.")
                     continue
                 if metadata is None:
                     metadata = item
                 elif (metadata["count"] != item["count"] or metadata["scales"] != item["scales"]
                       or metadata["offsets"] != item["offsets"]):
-                    raise ValueError("Scene con bande o scale/offset differenti: non si possono mosaicare senza conversione esplicita.")
+                    raise ValueError("Scenes have different bands or scales/offsets and cannot be mosaicked without explicit conversion.")
                 item["zone_projected"] = _project(zones[str(record["zone_id"])], "EPSG:4326", grid["crs"])
                 prepared.append(item)
             if not prepared:
-                summary["warnings"].append(f"{date}: nessun raster sovrapposto; data saltata.")
+                summary["warnings"].append(f"{date}: no overlapping rasters; date skipped.")
                 continue
             result = _mosaic_date(date, prepared, grid, metadata, indices, output_dir / date,
                                   staging, config, emit, cancel)
@@ -469,7 +469,7 @@ def process_area(area_plan, records, config, output_dir: Path, emit=lambda messa
                 item["image_path"].unlink(missing_ok=True)
                 item["score_path"].unlink(missing_ok=True)
             if result["no_valid_pixels"]:
-                summary["warnings"].append(f"{date}: tutti i pixel risultano NoData.")
+                summary["warnings"].append(f"{date}: all pixels are NoData.")
             _write_json(output_dir / "summary.json", summary)
     summary["day_count"] = len(summary["dates"])
     summary["valid_day_count"] = sum(not day["no_valid_pixels"] for day in summary["dates"])

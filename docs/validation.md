@@ -50,7 +50,7 @@ The real run contained one scene per date and no masked-out pixels inside the AO
 
 Several-minute UDM2 activation delays motivated periodic progress messages and activation in groups of eight. The revised search completed with the two masks already active; its speed benefit for eight initially inactive masks was not measured. Order polling reports elapsed session waiting time approximately once per minute without inventing completion percentages.
 
-Interactive BAT launchers, the folder picker and GUI operation on Windows remain untested, as does a real Planet API workflow on Windows. Actual contractual quota accounting and absolute geometric accuracy also remain to be verified. The GUI remains in Italian and uses an API-key field; the real backend test used OAuth on Linux.
+Interactive BAT launchers, the folder picker and GUI operation on Windows remain untested, as does a real Planet API workflow on Windows. Actual contractual quota accounting and absolute geometric accuracy also remain to be verified. The GUI is in English and uses an API-key field; the real backend test used OAuth on Linux.
 
 The public repository includes synthetic examples only. Real imagery, AOI geometry, identifiers, account details and private diagnostic files are omitted. Redistribution rights for the real dataset have not been verified.
 

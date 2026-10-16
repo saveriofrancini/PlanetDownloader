@@ -14,7 +14,7 @@ def main():
     app = create_app()
     server = make_server("127.0.0.1", args.port, app, threaded=True)
     url = f"http://127.0.0.1:{server.server_port}/"
-    print(f"\nPlanet Downloader\nApri: {url}\nMantieni aperta questa finestra durante il lavoro.\nCtrl+C per chiudere.\n", flush=True)
+    print(f"\nPlanet Downloader\nOpen: {url}\nKeep this window open while the job is running.\nPress Ctrl+C to close.\n", flush=True)
     if not args.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

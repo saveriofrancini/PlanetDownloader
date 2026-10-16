@@ -24,7 +24,7 @@
     "clear_only": true,
     "confidence_min": 70,
     "batch_size": 100,
-    "name_field": "nome",
+    "name_field": "name",
     "layer": ""
   }
 }

@@ -12,7 +12,7 @@ def main():
             module = importlib.import_module(name)
             print(f"OK {name}")
         except Exception as exc:
-            print(f"ERRORE {name}: {exc}")
+            print(f"ERROR {name}: {exc}")
             failures.append(name)
     if not failures:
         from pyproj import Transformer
@@ -22,7 +22,7 @@ def main():
         assert all(abs(x) < 1e8 for x in Transformer.from_crs(4326, 32632, always_xy=True).transform(11, 44))
         with MemoryFile():
             pass
-        print("Verifica locale completata. Nessuna chiamata a Planet eseguita.")
+        print("Local check complete. No Planet requests were made.")
     return bool(failures)
 
 if __name__ == "__main__":

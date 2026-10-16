@@ -6,28 +6,28 @@
 
 Planet Downloader searches PlanetScope imagery for vector-defined study areas and downloads it to your computer. After you review the image count and estimated area in km², it requests coregistration and clipping, then produces masked daily mosaics on a consistent grid for each study area.
 
-The application runs locally on Windows with an Italian browser interface. All settings are entered through the GUI; no code editing or Google Earth Engine account is required. An active Planet account with access to the requested imagery is necessary.
+The application runs locally on Windows with an English browser interface. All settings are entered through the GUI; no code editing or Google Earth Engine account is required. An active Planet account with access to the requested imagery is necessary.
 
 ## Install and start
 
 1. Install **Python 3.12, 64-bit**, from [python.org](https://www.python.org/downloads/windows/). Enable the Python launcher and **Add python.exe to PATH** in the installer.
 2. Open [this repository](https://github.com/saveriofrancini/PlanetDownloader), select **Code → Download ZIP**, and extract the entire archive into a writable folder, such as `C:\PlanetDownloader`. Do not run files from inside the ZIP.
-3. Double-click **`installa.bat`**. It creates a local Python environment, installs dependencies, and checks the installation. Internet access is required.
-4. Double-click **`avvia.bat`**. The GUI opens in your browser. Keep the accompanying program window open while working.
+3. Double-click **`install.bat`**. It creates a local Python environment, installs dependencies, and checks the installation. Internet access is required.
+4. Double-click **`start.bat`**. The GUI opens in your browser. Keep the accompanying program window open while working.
 
-For subsequent sessions, use `avvia.bat`. Run **`verifica_installazione.bat`** whenever you need to check Python and the required libraries; this diagnostic makes no Planet requests. Choose a local folder with enough space for downloaded assets, mosaics, and temporary files.
+For subsequent sessions, use `start.bat`. Run **`check_installation.bat`** whenever you need to check Python and the required libraries; this diagnostic makes no Planet requests. Choose a local folder with enough space for downloaded assets, mosaics, and temporary files.
 
 ## Search, review, and download
 
-1. Obtain your API key from your official [Planet account](https://www.planet.com/account/), under **My Settings**, and enter it in **Chiave API Planet**. See [Planet authentication guidance](https://docs.planet.com/develop/authentication/).
-2. Select a vector dataset and click **Leggi le aree** (*Read areas*). Supported formats are GeoPackage, GeoJSON, and Shapefile. For Shapefiles, select the `.shp`, `.shx`, `.dbf`, and `.prj` files together, or provide a ZIP containing them. A defined coordinate reference system is required.
+1. Obtain your API key from your official [Planet account](https://www.planet.com/account/), under **My Settings**, and enter it in **Planet API key**. See [Planet authentication guidance](https://docs.planet.com/develop/authentication/).
+2. Select a vector dataset and click **Load areas**. Supported formats are GeoPackage, GeoJSON, and Shapefile. For Shapefiles, select the `.shp`, `.shx`, `.dbf`, and `.prj` files together, or provide a ZIP containing them. A defined coordinate reference system is required.
 3. Choose a layer if the dataset contains several, and optionally specify the attribute containing area names. Each Polygon or MultiPolygon feature is processed independently; separate features are not dissolved. Areas are supplied as files, without drawing tools or a map.
-4. Set the product, dates, filters, masking options, and output folder. **Sfoglia…** means *Browse*. The `examples/` folder contains an independent demonstration polygon and example settings; replace these with your study inputs.
-5. Click **Cerca immagini** (*Search images*). The plan includes **all accessible scenes satisfying the filters**, not only the best image per month. Both date endpoints are included, using UTC acquisition dates. AOI quality checks may activate UDM2 assets and take several minutes; the search does not submit imagery orders.
-6. Review the scene table, warnings, image counts, and km² estimate. **Esporta CSV** and **Esporta piano** export the table and plan. Changed parameters require a new search.
-7. Click **Conferma e scarica** (*Confirm and download*) and accept the confirmation dialog to submit the planned orders. Keep the computer awake and connected.
+4. Set the product, dates, filters, masking options, and output folder. The `examples/` folder contains an independent demonstration polygon and example settings; replace these with your study inputs.
+5. Click **Search images**. The plan includes **all accessible scenes satisfying the filters**, not only the best image per month. Both date endpoints are included, using UTC acquisition dates. AOI quality checks may activate UDM2 assets and take several minutes; the search does not submit imagery orders.
+6. Review the scene table, warnings, image counts, and km² estimate. **Export CSV** and **Export plan** export the table and plan. Changed parameters require a new search.
+7. Click **Confirm and download** and accept the confirmation dialog to submit the planned orders. Keep the computer awake and connected.
 
-**Salva impostazioni** / **Carica impostazioni** save and load settings as JSON. The API key is excluded.
+**Save settings** / **Load settings** save and load settings as JSON. The API key is excluded.
 
 ## Products and parameters
 
@@ -81,9 +81,9 @@ The application preserves the product's numeric scale rather than converting val
 
 ## Stop and resume
 
-**Interrompi il lavoro locale** stops local work when possible; it **does not cancel orders already submitted to Planet**.
+**Stop local processing** stops local work when possible; it **does not cancel orders already submitted to Planet**.
 
-To resume, reopen the application, enter your API key, and enter the existing `Planet_job_...` path under **Riprendi un lavoro**. Click **Carica il lavoro**, review the saved plan, and confirm again. Keep the whole job folder. If submission status is uncertain, resume the same job rather than creating a new search that might duplicate an accepted order.
+To resume, reopen the application, enter your API key, and enter the existing `Planet_job_...` path under **Resume a job**. Click **Load job**, review the saved plan, and confirm again. Keep the whole job folder. If submission status is uncertain, resume the same job rather than creating a new search that might duplicate an accepted order.
 
 Completed downloads are checked and reused, including manifest checksums where provided. Downloads use temporary `.part` files, renamed atomically after verification; an interrupted file restarts from the beginning. Mosaics may be recomputed. If the search stopped before saving `plan.json`, repeat the search.
 
@@ -93,7 +93,7 @@ The API key remains in session memory and is excluded from saved settings, plans
 
 | Problem | What to check |
 |---|---|
-| Installation or startup fails | Confirm Python **3.12 x64**, run `verifica_installazione.bat`, and read the terminal error. Check Internet access and folder permissions. |
+| Installation or startup fails | Confirm Python **3.12 x64**, run `check_installation.bat`, and read the terminal error. Check Internet access and folder permissions. |
 | Browser cannot reach the app | Keep the launcher window open and use the local address it prints. |
 | No images / HTTP 401 or 403 | Check the vector CRS, period, thresholds, API key, product permissions, and contractual coverage. |
 | Long search or queued order | UDM2 activation and Planet processing take time. Read activity updates; resume the existing job instead of placing duplicate orders. |
@@ -112,4 +112,4 @@ Official references: [Data API](https://docs.planet.com/develop/apis/data/), [pr
 
 Contact: [saverio.francini@unibo.it](mailto:saverio.francini@unibo.it).
 
-A software licence has not yet been specified. Contact the maintainer about reuse or redistribution. Planet imagery remains subject to its applicable licence and account agreement.
+The original source code and documentation are distributed under the [MIT License](LICENSE). Copyright © 2026 Saverio Francini. Third-party dependencies retain their respective licences. Planet imagery remains subject to its applicable licence and account agreement; the software licence does not grant rights to Planet data.

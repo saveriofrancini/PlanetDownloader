@@ -62,13 +62,13 @@ def test_oauth_authenticator_is_used_only_for_api_requests(tmp_path):
 
 def test_oauth_rejects_ambiguous_or_invalid_authentication():
     auth = requests.auth.AuthBase()
-    with pytest.raises(PlanetError, match='non entrambi'):
+    with pytest.raises(PlanetError, match='not both'):
         PlanetClient('api-key', request_auth=auth)
     with pytest.raises(PlanetError, match='AuthBase'):
         PlanetClient(request_auth=lambda request: request)
-    with pytest.raises(PlanetError, match='autenticarsi'):
+    with pytest.raises(PlanetError, match='authenticate'):
         PlanetClient()
-    with pytest.raises(PlanetError, match='autenticarsi'):
+    with pytest.raises(PlanetError, match='authenticate'):
         PlanetClient('  ')
 
 
@@ -77,7 +77,7 @@ def test_oauth_http_error_never_echoes_response_token():
     response = Response(status=401)
     response.text = 'Bearer token-unknown-to-client; access_token=raw-token-echo'
     obj.session.request = Mock(return_value=response)
-    with pytest.raises(PlanetError, match='Credenziali Planet') as error:
+    with pytest.raises(PlanetError, match='Planet credentials') as error:
         obj.get_order('a')
     assert 'token-unknown-to-client' not in str(error.value)
     assert 'raw-token-echo' not in str(error.value)
@@ -146,8 +146,8 @@ def test_coverage_progress_at_first_activation_then_at_most_once_per_minute(monk
     assert obj.coverage('PSScene', 'test-scene', {'type': 'Polygon'}, 'cloud') == 4
     assert len(messages) == 2
     assert all('test-scene' in message and 'cloud' in message for message in messages)
-    assert '5 s trascorsi' in messages[0]
-    assert '65 s trascorsi' in messages[1]
+    assert '5 s elapsed' in messages[0]
+    assert '65 s elapsed' in messages[1]
     assert [call.args for call in obj.wait.call_args_list] == [(10,), (10,), (10,)]
 
 
@@ -186,7 +186,7 @@ def test_prime_coverage_rejects_bad_state_or_percentage():
                                            Response(data={'status': 'complete', 'clear_percent': 110})])
     with pytest.raises(PlanetError, match='failed'):
         obj.prime_coverage('PSScene', 'scene', {'type': 'Polygon'})
-    with pytest.raises(PlanetError, match='fuori intervallo'):
+    with pytest.raises(PlanetError, match='out of range'):
         obj.prime_coverage('PSScene', 'scene', {'type': 'Polygon'})
     assert obj._coverage_cache == {}
 
@@ -267,9 +267,9 @@ def test_order_poll_reports_wait_once_per_minute_and_stops_at_terminal(monkeypat
     assert _poll(obj, running, entry, save, messages.append) is completed
 
     assert messages == [
-        'Ordine order-id: running.',
-        'Ordine order-id: ancora running, attesa da 60 s.',
-        f'Ordine order-id: {terminal}.',
+        'Order order-id: running.',
+        'Order order-id: still running, waiting for 60 s.',
+        f'Order order-id: {terminal}.',
     ]
     assert entry['remote_state'] == terminal
     assert save.call_count == obj.check_cancel.call_count == 5

@@ -98,7 +98,7 @@ def test_missing_crs_is_not_guessed(tmp_path):
     frame = gpd.GeoDataFrame(geometry=[box(500000, 4900000, 500100, 4900100)])
     with pytest.warns(UserWarning):
         frame.to_file(file, engine="pyogrio")
-    with pytest.raises(ValueError, match="CRS assente"):
+    with pytest.raises(ValueError, match="Missing CRS"):
         load_areas(str(file))
 
 
@@ -107,10 +107,10 @@ def test_multilayer_requires_selection_and_missing_field_fails(tmp_path):
     frame = gpd.GeoDataFrame({"name": ["A"]}, geometry=[box(11, 44, 11.01, 44.01)], crs=4326)
     frame.to_file(file, layer="one", engine="pyogrio")
     frame.to_file(file, layer="two", engine="pyogrio", append=False)
-    with pytest.raises(ValueError, match="più layer"):
+    with pytest.raises(ValueError, match="multiple layers"):
         load_areas(str(file))
     assert len(load_areas(str(file), layer="two")) == 1
-    with pytest.raises(ValueError, match="Campo nome"):
+    with pytest.raises(ValueError, match="Name field"):
         load_areas(str(file), layer="two", name_field="missing")
 
 
@@ -144,7 +144,7 @@ def test_missing_or_unpermitted_assets_excluded_before_coverage(assets):
     plan = build_plan(client, [area()], settings(aoi_clear_min=70))
     assert plan["totals"]["scene_count"] == 0
     assert not client.coverages
-    assert "asset mancanti" in plan["areas"][0]["warnings"][0]
+    assert "missing or unauthorized assets" in plan["areas"][0]["warnings"][0]
 
 
 def test_coverage_uses_intersection_and_is_separate_from_scene_coverage():
@@ -207,7 +207,7 @@ def test_large_aoi_partition_preserves_all_scene_intersections():
         z = shape(zone["geometry"])
         assert z.difference(geometries[zone["anchor_id"]]).area == 0
         assert set(zone["scene_ids"]) == {key for key, geom in geometries.items() if geom.intersection(z).area > 0}
-    assert any("più riferimenti" in warning for warning in ap["warnings"])
+    assert any("multiple references" in warning for warning in ap["warnings"])
 
 
 def test_overlapping_aoi_unique_area_and_asset_requests_deduplicated():
@@ -279,7 +279,7 @@ def test_irreducible_small_covered_island_reports_partition_not_bad_input():
     aoi = transform(to_wgs, box(650000, 4900000, 650100, 4900100))
     first = transform(to_wgs, box(650000, 4900000, 650099, 4900100))
     tiny = transform(to_wgs, box(650099.8, 4900000, 650100, 4900000.2))
-    with pytest.raises(ValueError, match="Residuo della partizione"):
+    with pytest.raises(ValueError, match="Partition residual"):
         build_plan(Client([feature("A", first), feature("B", tiny)]), [area(aoi)], settings())
 
 

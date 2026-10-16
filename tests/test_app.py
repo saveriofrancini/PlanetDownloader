@@ -45,7 +45,7 @@ def test_zip_traversal_rejected(app):
     blob.seek(0)
     response = app.test_client().post('/api/vector', data={'files': (blob, 'areas.zip')}, headers=auth(app))
     assert response.status_code == 400
-    assert 'Percorso' in response.json['error']
+    assert 'path' in response.json['error']
 
 
 def test_config_finite_and_secrets_excluded(tmp_path):
@@ -102,4 +102,4 @@ def test_modified_resume_plan_rejected(app, tmp_path):
     (tmp_path / 'plan.sha256').write_text('incorrect')
     response = app.test_client().post('/api/resume', json={'job_dir': str(tmp_path), 'api_key': 'test-not-real'}, headers=auth(app))
     assert response.status_code == 400
-    assert 'modificato' in response.json['error']
+    assert 'modified' in response.json['error']

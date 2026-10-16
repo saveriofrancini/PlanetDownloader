@@ -1,0 +1,14 @@
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.env.*
+!.env.example
+Planet_job_*/
+test_reale/test_2023_07_04_05/
+examples/area_test_reale_id11.geojson
+*.part
+*.log

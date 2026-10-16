@@ -17,7 +17,7 @@ Coverage includes:
 
 Offline GUI checks in Chromium 153 on Linux exercised vector upload, all four product options, the plan summary, invalidation of confirmation after filter changes, confirmation acceptance and cancellation, partial results and credential-free settings export. No browser storage, JavaScript or Content Security Policy errors, or horizontal overflow at 1024 pixels were observed.
 
-On **2026-10-16**, [public CI](https://github.com/saveriofrancini/PlanetDownloader/actions/runs/38873613778) at commit `28ccccb85b336161a5f423165031a8a4bc6cf228` successfully installed binary dependencies and passed the test suite on Windows and Ubuntu with Python 3.12. The Windows job also passed `verifica_installazione.py`. These automated checks do not cover interactive BAT launchers, the folder picker or GUI operation on Windows. The Linux browser checks were not a live end-to-end test of the GUI using an API key.
+On **2026-10-16**, [public CI](https://github.com/saveriofrancini/PlanetDownloader/actions/runs/38875507784) at commit `94cdf32beec57ad60f2262b015ff8fb676ff9d7a` successfully installed binary dependencies and passed the test suite on Windows and Ubuntu with Python 3.12. The Windows job also passed `verifica_installazione.py`. These automated checks do not cover interactive BAT launchers, the folder picker or GUI operation on Windows. The Linux browser checks were not a live end-to-end test of the GUI using an API key.
 
 ## Real API run
 

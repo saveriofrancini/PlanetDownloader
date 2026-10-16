@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Planet · Download locale</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Planet Download, pagina iniziale"><span class="brand-mark" aria-hidden="true">P</span><span>Planet <span class="brand-sub">/ Download locale</span></span></a>
+    <span class="local-badge"><span aria-hidden="true"></span> Sul tuo computer</span>
+  </header>
+  <main>
+    <div class="hero">
+      <div><p class="eyebrow">IMMAGINI SATELLITARI · WORKSPACE LOCALE</p><h1>Dalla tua area,<br>ai tuoi dati.</h1><p class="lead">Cerca le acquisizioni Planet, controlla la stima e scarica mosaici giornalieri coregistrati.</p></div>
+      <ol class="steps" aria-label="Fasi del lavoro"><li class="current" id="step-1"><span>01</span> Imposta</li><li id="step-2"><span>02</span> Controlla</li><li id="step-3"><span>03</span> Scarica</li></ol>
+    </div>
+
+    <div id="global-error" class="notice error" role="alert" hidden></div>
+    <div id="boot-message" class="notice">Caricamento delle impostazioni…</div>
+
+    <div class="workspace">
+      <form id="config-form" class="configuration" autocomplete="off">
+        <section class="card" aria-labelledby="source-title">
+          <div class="section-heading"><span class="section-number">01</span><div><h2 id="source-title">Accesso e area di studio</h2><p>Ogni elemento del file vettoriale viene elaborato come un’area distinta.</p></div></div>
+          <div class="field"><label for="api-key">Chiave API Planet <span class="required">*</span></label><div class="password-wrap"><input id="api-key" type="password" placeholder="Inserisci la chiave del tuo account" autocomplete="off" spellcheck="false"><button id="toggle-key" type="button" class="text-button" aria-label="Mostra chiave API" aria-pressed="false">Mostra</button></div><small>Usata solo nella sessione. Non viene inclusa nei file di impostazioni o nei report.</small></div>
+          <div class="field"><label for="vector-files">File vettoriale <span class="required">*</span></label><div class="file-box"><input id="vector-files" type="file" multiple accept=".gpkg,.geojson,.json,.zip,.shp,.shx,.dbf,.prj,.cpg,.qix,.sbn,.sbx"><p>GeoPackage, GeoJSON, ZIP o tutti i componenti di uno Shapefile.</p></div></div>
+          <div class="form-row"><div class="field"><label for="layer">Layer</label><input id="layer" name="layer" type="text" list="vector-layers" placeholder="Obbligatorio se più layer"><datalist id="vector-layers"></datalist><small>Puoi lasciare vuoto se il file contiene un solo layer.</small></div><div class="field"><label for="name-field">Campo con il nome dell’area <span class="optional">facoltativo</span></label><input id="name-field" name="name_field" type="text" placeholder="Es. nome_area"></div></div>
+          <button id="load-vector" type="button" class="button secondary">Leggi le aree</button>
+          <div id="vector-status" class="inline-status" role="status" aria-live="polite"></div>
+          <div id="area-list" class="area-list" hidden></div>
+        </section>
+
+        <section class="card" aria-labelledby="filter-title">
+          <div class="section-heading"><span class="section-number">02</span><div><h2 id="filter-title">Prodotto e filtri</h2><p>Tutte le immagini disponibili che rispettano questi criteri.</p></div></div>
+          <div class="field"><label for="product">Prodotto Planet</label><select id="product" name="product"></select><small id="product-description"></small></div>
+          <div class="form-row"><div class="field"><label for="start-date">Dal giorno</label><input id="start-date" name="start_date" type="date" required></div><div class="field"><label for="end-date">Al giorno</label><input id="end-date" name="end_date" type="date" required></div></div>
+          <p class="field-note">Entrambe le date sono incluse. Acquisizioni e mosaici sono raggruppati per giorno UTC.</p>
+          <div class="form-row"><div class="field"><label for="cloud-scene-max">Nuvole nell’intera scena, massimo</label><div class="unit-input"><input id="cloud-scene-max" name="cloud_scene_max" type="number" min="0" max="100" step="1" value="30" required><span>%</span></div></div><div class="field"><label for="coverage-min">Copertura dell’area per scena, minimo</label><div class="unit-input"><input id="coverage-min" name="coverage_min" type="number" min="0" max="100" step="1" value="0" required><span>%</span></div></div></div>
+          <div class="inset">
+            <div class="inset-title">Qualità all’interno dell’area</div><p class="field-note">Valutazione UDM2 sull’area specifica: più precisa del valore della scena, ma richiede più tempo. Può richiedere l’attivazione delle maschere su Planet.</p>
+            <div class="form-row"><div class="field"><label class="check-label" for="aoi-cloud-enabled"><input id="aoi-cloud-enabled" type="checkbox" checked> Limite nuvole nell’area</label><div class="unit-input"><input id="aoi-cloud-max" name="aoi_cloud_max" aria-label="Nuvole nell’area, massimo percentuale" type="number" min="0" max="100" step="1" value="20"><span>% max</span></div></div><div class="field"><label class="check-label" for="aoi-clear-enabled"><input id="aoi-clear-enabled" type="checkbox" checked> Minimo pixel chiari nell’area</label><div class="unit-input"><input id="aoi-clear-min" name="aoi_clear_min" aria-label="Pixel chiari nell’area, minimo percentuale" type="number" min="0" max="100" step="1" value="70"><span>% min</span></div></div></div>
+          </div>
+          <details class="advanced"><summary>Filtri avanzati di acquisizione</summary><div class="details-content"><div class="checkbox-grid"><label class="check-label"><input id="quality-standard" name="quality_standard" type="checkbox" checked> Solo qualità standard</label><label class="check-label"><input id="ground-control" name="ground_control" type="checkbox" checked> Richiedi punti di controllo a terra</label></div><div class="form-row"><div class="field"><label for="sun-elevation-min">Elevazione solare minima</label><div class="unit-input"><input id="sun-elevation-min" name="sun_elevation_min" type="number" min="0" max="90" step="1" value="0"><span>°</span></div></div><div class="field"><label for="view-angle-max">Angolo di vista massimo</label><div class="unit-input"><input id="view-angle-max" name="view_angle_max" type="number" min="0" max="90" step="1" value="30"><span>°</span></div></div></div></div></details>
+        </section>
+
+        <section class="card" aria-labelledby="output-title">
+          <div class="section-heading"><span class="section-number">03</span><div><h2 id="output-title">Elaborazione e destinazione</h2><p>Un mosaico per area e giorno, con maschera e provenienza dei pixel.</p></div></div>
+          <div class="processing-note"><span aria-hidden="true">✓</span><div><strong>Coregistrazione sempre attiva</strong><p>Riferimenti scelti automaticamente, griglia comune per tutte le date. Eventuali scene non coregistrate vengono escluse e segnalate.</p></div></div>
+          <div class="field"><label for="output-dir">Cartella dei download <span class="required">*</span></label><div class="input-action"><input id="output-dir" name="output_dir" type="text" placeholder="C:\Users\nome\Downloads\Planet" required><button id="browse-output" type="button" class="button secondary">Sfoglia…</button></div><small>Ogni lavoro crea una sottocartella con piano, stato, dati originali e mosaici.</small></div>
+          <div class="form-row"><div class="field"><label for="resolution">Dimensione del pixel</label><div class="unit-input"><input id="resolution" name="resolution" type="number" min="0.1" max="1000" step="0.1" value="3" required><span>metri</span></div></div><div class="field"><label for="target-epsg">Sistema di riferimento EPSG</label><input id="target-epsg" name="target_epsg" type="text" placeholder="Automatico · UTM per area"><small>Facoltativo. Inserisci un codice proiettato, es. 32632.</small></div></div>
+          <div class="inset"><div class="inset-title">Maschera dei pixel</div><label class="check-label"><input id="clear-only" name="clear_only" type="checkbox" checked> Conserva solo i pixel classificati come chiari</label><p class="field-note">La maschera viene applicata prima del mosaico. Pixel non utilizzabili e sotto la soglia di confidenza diventano NoData.</p><div class="field compact-field"><label for="confidence-min">Confidenza UDM2 minima</label><div class="unit-input"><input id="confidence-min" name="confidence_min" type="number" min="0" max="100" step="1" value="70"><span>%</span></div></div><fieldset id="mask-custom" hidden><legend>Classi da escludere</legend><div class="checkbox-grid"><label class="check-label"><input type="checkbox" name="mask_class" value="snow" checked> Neve</label><label class="check-label"><input type="checkbox" name="mask_class" value="shadow" checked> Ombra</label><label class="check-label"><input type="checkbox" name="mask_class" value="light_haze" checked> Foschia leggera</label><label class="check-label"><input type="checkbox" name="mask_class" value="heavy_haze" checked> Foschia intensa</label><label class="check-label"><input type="checkbox" name="mask_class" value="cloud" checked> Nuvole</label></div></fieldset></div>
+          <details class="advanced"><summary>Gestione degli ordini</summary><div class="details-content"><div class="field compact-field"><label for="batch-size">Scene per blocco di ordine</label><input id="batch-size" name="batch_size" type="number" min="1" max="499" step="1" value="100"><small>Il riferimento di coregistrazione viene aggiunto quando necessario.</small></div></div></details>
+          <div class="form-footer"><button id="save-settings" type="button" class="text-button">Salva impostazioni</button><button id="load-settings" type="button" class="text-button">Carica impostazioni</button><input id="settings-file" type="file" accept=".json" hidden></div>
+        </section>
+      </form>
+
+      <aside class="right-column">
+        <section class="card launch-card" aria-labelledby="launch-title"><p class="eyebrow">PRIMA DI SCARICARE</p><h2 id="launch-title">Inizia dalla ricerca</h2><p>La ricerca restituisce un piano e una stima in km². Gli ordini vengono inviati solo dopo la tua conferma.</p><button id="search-button" type="submit" form="config-form" class="button primary full-width" disabled>Cerca immagini <span aria-hidden="true">→</span></button><p class="quiet">È richiesta una connessione a Internet e un account Planet abilitato al prodotto scelto.</p></section>
+        <section id="job-panel" class="card job-panel" aria-labelledby="job-title" hidden><div class="status-heading"><h2 id="job-title">Stato del lavoro</h2><span id="job-status" class="status-chip">In attesa</span></div><div id="job-id" class="job-id"></div><p id="job-description" class="field-note"></p><div id="job-location" class="job-location" hidden></div><div id="job-spinner" class="activity-track" hidden><div></div></div><div id="job-error" class="notice error" hidden></div><button id="cancel-button" type="button" class="button secondary full-width" hidden>Interrompi il lavoro locale</button><p id="cancel-note" class="quiet" hidden>Gli ordini già inviati a Planet continuano sul server. Potrai riprendere il download dalla cartella del lavoro.</p><details class="log-details" open><summary>Attività</summary><pre id="job-logs" tabindex="0" aria-label="Registro delle attività"></pre></details></section>
+        <section class="card resume-card" aria-labelledby="resume-title"><h2 id="resume-title">Riprendi un lavoro</h2><p>Apri una cartella <code>Planet_job_…</code> già creata. Reinserisci la chiave API; potrai controllare il piano prima di continuare.</p><div class="field"><label for="resume-dir">Cartella del lavoro</label><input id="resume-dir" type="text" placeholder="C:\…\Planet_job_…"></div><button id="resume-button" type="button" class="button secondary full-width">Carica il lavoro</button></section>
+      </aside>
+    </div>
+
+    <section id="results" class="card results-card" aria-labelledby="results-title" hidden>
+      <div class="results-heading"><div><p class="eyebrow">PIANO DI DOWNLOAD</p><h2 id="results-title">Controlla prima di confermare</h2><p id="plan-context"></p></div><div class="export-actions"><button id="export-csv" type="button" class="button secondary small">Esporta CSV</button><button id="export-plan" type="button" class="button secondary small">Esporta piano</button></div></div>
+      <div id="stale-notice" class="notice warning" hidden>Hai modificato i parametri dopo la ricerca. Esegui una nuova ricerca prima di confermare il download.</div>
+      <div class="metrics"><div class="metric"><span>Scene × aree</span><strong id="metric-scenes">—</strong><small id="unique-scenes"></small></div><div class="metric"><span>Aree di studio</span><strong id="metric-areas">—</strong><small id="day-count"></small></div><div class="metric accent"><span>Stima geometrica degli ordini</span><strong id="metric-km2">—</strong><small>km² · riferimenti ripetuti inclusi</small></div><div class="metric"><span>Ordini previsti</span><strong id="metric-orders">—</strong><small>Con coregistrazione e ritaglio</small></div></div>
+      <div class="notice estimate-note"><strong>La stima non è una quota contrattuale garantita.</strong><p>Somma l’intersezione delle immagini ordinate con le zone di elaborazione, inclusi i riferimenti ripetuti. Il consumo effettivo dipende dal contratto universitario Planet, dai minimi fatturabili e dalle regole del tuo account.</p><p id="estimate-details"></p></div>
+      <div id="plan-warnings" class="notice warning" hidden></div>
+      <div id="areas-summary" class="area-summary"></div>
+      <details class="scenes-details"><summary id="scene-table-label">Elenco delle immagini</summary><div class="table-scroll"><table><thead><tr><th>Area</th><th>Data UTC</th><th>ID scena</th><th>Nuvole scena</th><th>Chiaro scena</th><th>Nuvole area</th><th>Chiaro area</th><th>Copertura area</th></tr></thead><tbody id="scenes-table"></tbody></table></div><button id="more-scenes" type="button" class="text-button" hidden>Mostra altre 200 righe</button></details>
+      <div class="confirm-bar"><div><strong id="confirm-title">Pronto per il download?</strong><p id="confirm-description">Saranno scaricate tutte le immagini del piano. I file finali sono organizzati per area e data.</p></div><button id="confirm-button" type="button" class="button primary">Conferma e scarica <span aria-hidden="true">↓</span></button></div>
+    </section>
+
+    <section id="completion" class="card completion-card" aria-labelledby="completion-title" hidden><p class="eyebrow">ESITO</p><h2 id="completion-title">Elaborazione terminata</h2><p id="completion-description"></p><div id="completion-location" class="output-location" hidden></div><div id="completion-warnings" class="notice warning" hidden></div><details><summary>Dettagli del risultato</summary><pre id="completion-json"></pre></details></section>
+    <footer>Planet Download locale <span>·</span> Interfaccia italiana per ricerca, ordini e mosaici giornalieri.</footer>
+  </main>
+</body>
+</html>

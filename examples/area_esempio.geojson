@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [{
+    "type": "Feature",
+    "properties": {"nome": "Area_dimostrativa"},
+    "geometry": {"type": "Polygon", "coordinates": [[[11.0, 43.5], [11.01, 43.5], [11.01, 43.51], [11.0, 43.51], [11.0, 43.5]]]}
+  }]
+}

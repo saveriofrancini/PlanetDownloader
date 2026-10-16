@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "config": {
+    "product": "ps_sr_4b",
+    "start_date": "2026-06-01",
+    "end_date": "2026-06-07",
+    "cloud_scene_max": 30,
+    "aoi_cloud_max": 20,
+    "aoi_clear_min": 70,
+    "coverage_min": 0,
+    "quality_standard": true,
+    "ground_control": true,
+    "sun_elevation_min": 0,
+    "view_angle_max": 30,
+    "target_epsg": "",
+    "resolution": 3,
+    "mask_classes": [
+      "snow",
+      "shadow",
+      "light_haze",
+      "heavy_haze",
+      "cloud"
+    ],
+    "clear_only": true,
+    "confidence_min": 70,
+    "batch_size": 100,
+    "name_field": "nome",
+    "layer": ""
+  }
+}

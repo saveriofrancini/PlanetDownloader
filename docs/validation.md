@@ -17,7 +17,7 @@ Coverage includes:
 
 Offline GUI checks in Chromium 153 on Linux exercised vector upload, all four product options, the plan summary, invalidation of confirmation after filter changes, confirmation acceptance and cancellation, partial results and credential-free settings export. No browser storage, JavaScript or Content Security Policy errors, or horizontal overflow at 1024 pixels were observed.
 
-Windows x64/Python 3.12 binary distributions were resolved and downloaded for runtime dependencies and their transitive dependencies. **A native Windows session has not yet been tested**, including BAT launchers and the folder picker. The browser checks were not a live end-to-end test of the GUI using an API key.
+On **2026-10-16**, [public CI](https://github.com/saveriofrancini/PlanetDownloader/actions/runs/38873613778) at commit `28ccccb85b336161a5f423165031a8a4bc6cf228` successfully installed binary dependencies and passed the test suite on Windows and Ubuntu with Python 3.12. The Windows job also passed `verifica_installazione.py`. These automated checks do not cover interactive BAT launchers, the folder picker or GUI operation on Windows. The Linux browser checks were not a live end-to-end test of the GUI using an API key.
 
 ## Real API run
 
@@ -50,7 +50,7 @@ The real run contained one scene per date and no masked-out pixels inside the AO
 
 Several-minute UDM2 activation delays motivated periodic progress messages and activation in groups of eight. The revised search completed with the two masks already active; its speed benefit for eight initially inactive masks was not measured. Order polling reports elapsed session waiting time approximately once per minute without inventing completion percentages.
 
-Native Windows operation, actual contractual quota accounting and absolute geometric accuracy remain to be verified. The GUI remains in Italian and uses an API-key field; the real backend test used OAuth.
+Interactive BAT launchers, the folder picker and GUI operation on Windows remain untested, as does a real Planet API workflow on Windows. Actual contractual quota accounting and absolute geometric accuracy also remain to be verified. The GUI remains in Italian and uses an API-key field; the real backend test used OAuth on Linux.
 
 The public repository includes synthetic examples only. Real imagery, AOI geometry, identifiers, account details and private diagnostic files are omitted. Redistribution rights for the real dataset have not been verified.
 

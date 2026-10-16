@@ -102,9 +102,9 @@ The API key remains in session memory and is excluded from saved settings, plans
 
 ## Validation and further reading
 
-The documented validation includes **69 passing offline tests** and a live backend run using four-band surface reflectance on two dates. Downloads, common-grid outputs, and resumption were verified. Planet's reported registration matching score increased from **0.687 to 0.704**; this is not an independent positional-accuracy measurement.
+The documented validation includes **69 passing offline tests on Windows and Ubuntu with Python 3.12** and a live backend run using four-band surface reflectance on two dates. The [automated validation run](https://github.com/saveriofrancini/PlanetDownloader/actions/runs/38873613778) also verified dependency installation and the Windows diagnostic script. Downloads, common-grid outputs, and resumption were verified in the live run. Planet's reported registration matching score increased from **0.687 to 0.704**; this is not an independent positional-accuracy measurement.
 
-The live test used Linux and one scene per date. Same-day multisource mosaicking and contaminated-pixel replacement were tested offline. The GUI was checked in Chromium on Linux; native Windows launchers and contractual quota consumption remain unverified. See [method and limitations](docs/method.md) and [validation scope](docs/validation.md).
+The live test used Linux and one scene per date. Same-day multisource mosaicking and contaminated-pixel replacement were tested offline. The GUI was checked in Chromium on Linux; interactive Windows launcher and GUI operation, and contractual quota consumption, remain unverified. See [method and limitations](docs/method.md) and [validation scope](docs/validation.md).
 
 Official references: [Data API](https://docs.planet.com/develop/apis/data/), [product bundles](https://docs.planet.com/develop/apis/orders/product_bundles/), [order tools and coregistration](https://docs.planet.com/develop/apis/orders/tools/), [PlanetScope products](https://docs.planet.com/data/imagery/planetscope/), and [UDM specifications](https://docs.planet.com/data/imagery/udm/).
 
